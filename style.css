@@ -32,3 +32,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
 /* v14 */
 .mode-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}.mode-button{padding:13px;border-radius:12px;border:1px solid var(--border);background:transparent;font-weight:800}.mode-button.active{background:var(--primary);color:#fff;border-color:transparent}.game-number-label{display:block;margin-bottom:16px}.game-number-label input{max-width:180px}.toggle-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:14px 0}.check-toggle,.count-toggle{padding:12px;border-radius:12px;border:1px solid var(--border);background:transparent;font-weight:700}.check-toggle.selected,.count-toggle.selected{background:rgba(34,197,94,.16);border-color:#22c55e}.card-count-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}.card-count-grid>div{display:grid;gap:8px}.winner-only-panel{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0}.winner-button{min-height:92px;border:0;border-radius:16px;font-size:30px;font-weight:900;color:white}.winner-button.banker{background:#d33}.winner-button.player{background:#2563eb}.winner-button.tie{background:#16a34a}@media(max-width:600px){.toggle-grid,.card-count-grid{grid-template-columns:1fr}.winner-only-panel{gap:8px}.winner-button{min-height:78px;font-size:26px}}
+
+
+/* v14.1 儲存結果提示 */
+.save-toast{position:fixed;left:50%;bottom:calc(28px + env(safe-area-inset-bottom));z-index:9999;max-width:calc(100% - 32px);padding:13px 18px;border-radius:999px;color:#fff;font-weight:900;box-shadow:0 12px 36px rgba(0,0,0,.35);opacity:0;transform:translate(-50%,18px);pointer-events:none;transition:opacity .18s ease,transform .18s ease;white-space:nowrap}
+.save-toast.show{opacity:1;transform:translate(-50%,0)}
+.save-toast.success{background:#15803d}
+.save-toast.error{background:#b91c1c}
