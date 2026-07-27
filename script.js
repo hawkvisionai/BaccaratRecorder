@@ -1,5 +1,5 @@
-const APP_VERSION="v11.0";
-const FEATURE_LEVEL=11;
+const APP_VERSION="v12.0";
+const FEATURE_LEVEL=12;
 const DATA_KEY="baccaratAnalyzerDataV11";
 const LEGACY_GAMES_KEY="baccaratAnalyzerGames";
 const LEGACY_SESSION_KEY="baccaratAnalyzerSessionName";
@@ -25,11 +25,11 @@ function loadData(){
  let oldGames=[];
  try{const x=JSON.parse(localStorage.getItem(LEGACY_GAMES_KEY)||"[]");if(Array.isArray(x))oldGames=x}catch{}
  const first={id:"S000001",name:localStorage.getItem(LEGACY_SESSION_KEY)||"",status:"open",createdAt:new Date().toISOString(),finishedAt:null,games:oldGames};
- const migrated={version:"11.0",currentShoeId:first.id,nextShoeNumber:2,shoes:[first]};
+ const migrated={version:"12.0",currentShoeId:first.id,nextShoeNumber:2,shoes:[first]};
  localStorage.setItem(DATA_KEY,JSON.stringify(migrated));
  return migrated;
 }
-function saveData(){localStorage.setItem(DATA_KEY,JSON.stringify(data))}
+function saveData(){data.version="12.0";localStorage.setItem(DATA_KEY,JSON.stringify(data))}
 function getCurrentShoe(){let s=data.shoes.find(x=>x.id===data.currentShoeId);if(!s){s=data.shoes[0];data.currentShoeId=s.id}return s}
 function syncCurrent(){games=getCurrentShoe().games;sessionName.value=getCurrentShoe().name||""}
 function nextShoe(name=""){const n=data.nextShoeNumber++;return{id:`S${String(n).padStart(6,"0")}`,name:name.trim(),status:"open",createdAt:new Date().toISOString(),finishedAt:null,games:[]}}
@@ -76,14 +76,64 @@ function download(name,text,type){const a=document.createElement("a"),url=URL.cr
 function csvEscape(v){const s=String(v??"");return/[",\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s}
 function exportCsv(){const s=getCurrentShoe(),rows=[["牌靴編號","牌靴名稱","局數","莊點數","閒點數","勝方","差值","時間"],...games.map((g,i)=>[s.id,s.name,i+1,g.banker,g.player,g.winner,g.difference,g.createdAt])];download(`${s.id}_baccarat.csv`,rows.map(r=>r.map(csvEscape).join(",")).join("\n"),"text/csv;charset=utf-8")}
 function importCsv(file){if(getCurrentShoe().status==="finished"){showMessage("已結束的牌靴不能匯入資料","error");return}const r=new FileReader();r.onload=()=>{try{const lines=String(r.result).replace(/^\uFEFF/,"").trim().split(/\r?\n/),newFmt=lines[0].startsWith("牌靴編號"),off=newFmt?2:0;const parsed=lines.slice(1).filter(Boolean).map(line=>{const x=line.split(",");return{banker:Number(x[off+1]),player:Number(x[off+2]),winner:x[off+3],difference:Number(x[off+4]),createdAt:x[off+5]||new Date().toISOString()}});if(parsed.some(g=>!Number.isInteger(g.banker)||!Number.isInteger(g.player)||!["莊","閒","和"].includes(g.winner)))throw Error();games.splice(0,games.length,...parsed);redoStack=[];saveData();renderAll();showMessage("CSV 匯入成功","success")}catch{showMessage("CSV 格式不正確","error")}};r.readAsText(file,"utf-8")}
-function exportJson(){download("baccarat_v11_backup.json",JSON.stringify({version:APP_VERSION,...data},null,2),"application/json")}
-function importJson(file){const r=new FileReader();r.onload=()=>{try{const obj=JSON.parse(r.result);if(Array.isArray(obj.shoes)){data={version:"11.0",currentShoeId:obj.currentShoeId,nextShoeNumber:Number(obj.nextShoeNumber)||1,shoes:obj.shoes}}else if(Array.isArray(obj.games)){const s={id:"S000001",name:obj.session||"",status:"open",createdAt:new Date().toISOString(),finishedAt:null,games:obj.games};data={version:"11.0",currentShoeId:s.id,nextShoeNumber:2,shoes:[s]}}else throw Error();if(!data.shoes.length)throw Error();if(!data.shoes.some(s=>s.id===data.currentShoeId))data.currentShoeId=data.shoes[0].id;syncCurrent();redoStack=[];saveData();renderAll();showMessage("JSON 還原成功","success")}catch{showMessage("JSON 格式不正確","error")}};r.readAsText(file,"utf-8")}
-function renderAll(){renderCurrentShoeInfo();updateStats();updateRecent();updateStreaks();renderBeadRoad();renderRoads();updateDifference();drawCharts();showHistory();renderShoeHistory()}
+function exportJson(){download("baccarat_v12_backup.json",JSON.stringify({version:APP_VERSION,...data},null,2),"application/json")}
+function importJson(file){const r=new FileReader();r.onload=()=>{try{const obj=JSON.parse(r.result);if(Array.isArray(obj.shoes)){data={version:"12.0",currentShoeId:obj.currentShoeId,nextShoeNumber:Number(obj.nextShoeNumber)||1,shoes:obj.shoes}}else if(Array.isArray(obj.games)){const s={id:"S000001",name:obj.session||"",status:"open",createdAt:new Date().toISOString(),finishedAt:null,games:obj.games};data={version:"12.0",currentShoeId:s.id,nextShoeNumber:2,shoes:[s]}}else throw Error();if(!data.shoes.length)throw Error();if(!data.shoes.some(s=>s.id===data.currentShoeId))data.currentShoeId=data.shoes[0].id;syncCurrent();redoStack=[];saveData();renderAll();showMessage("JSON 還原成功","success")}catch{showMessage("JSON 格式不正確","error")}};r.readAsText(file,"utf-8")}
+
+function streaksFor(list){
+ let type="",run=0,maxB=0,maxP=0;
+ list.filter(g=>g.winner!=="和").forEach(g=>{if(g.winner===type)run++;else{type=g.winner;run=1}if(type==="莊")maxB=Math.max(maxB,run);else maxP=Math.max(maxP,run)});
+ return{maxB,maxP,maxAny:Math.max(maxB,maxP)};
+}
+function shoeNumber(s){return Number(String(s.id).replace(/\D/g,""))||0}
+function selectedAnalyticsShoes(){
+ let list=[...data.shoes].sort((a,b)=>shoeNumber(b)-shoeNumber(a));
+ const scope=analyticsScope.value;
+ if(scope!=="all")list=list.slice(0,Number(scope));
+ const q=shoeAnalyticsSearch.value.trim().toLowerCase();
+ const status=shoeStatusFilter.value;
+ const minStreak=Math.max(0,Number(minimumStreakFilter.value)||0);
+ list=list.filter(s=>(!q||s.id.toLowerCase().includes(q)||(s.name||"").toLowerCase().includes(q))&&(status==="all"||s.status===status)&&streaksFor(s.games).maxAny>=minStreak);
+ const sort=shoeSort.value;
+ list.sort((a,b)=>{
+  const ac=counts(a.games),bc=counts(b.games);
+  if(sort==="oldest")return shoeNumber(a)-shoeNumber(b);
+  if(sort==="gamesDesc")return bc.total-ac.total||shoeNumber(b)-shoeNumber(a);
+  if(sort==="bankerRateDesc")return (bc.total?bc.b/bc.total:0)-(ac.total?ac.b/ac.total:0)||bc.total-ac.total;
+  if(sort==="playerRateDesc")return (bc.total?bc.p/bc.total:0)-(ac.total?ac.p/ac.total:0)||bc.total-ac.total;
+  return shoeNumber(b)-shoeNumber(a);
+ });
+ return list;
+}
+function aggregateShoes(shoes){return counts(shoes.flatMap(s=>s.games))}
+function renderGlobalAnalytics(){
+ const shoes=selectedAnalyticsShoes(),all=aggregateShoes(shoes),finished=shoes.filter(s=>s.status==="finished").length;
+ const streakSummary=shoes.reduce((a,s)=>{const x=streaksFor(s.games);return{maxB:Math.max(a.maxB,x.maxB),maxP:Math.max(a.maxP,x.maxP)}},{maxB:0,maxP:0});
+ const avg=shoes.length?(all.total/shoes.length).toFixed(1):"0.0";
+ globalStats.innerHTML=[
+  ["符合牌靴",`${shoes.length} 靴`],["已結束",`${finished} 靴`],["合計局數",all.total],["平均每靴",`${avg} 局`],
+  ["莊",`${all.b}（${calcRate(all.b,all.total)}%）`],["閒",`${all.p}（${calcRate(all.p,all.total)}%）`],["和",`${all.t}（${calcRate(all.t,all.total)}%）`],["最長連續",`莊 ${streakSummary.maxB}｜閒 ${streakSummary.maxP}`]
+ ].map(x=>`<div class="stat-card"><span class="stat-label">${x[0]}</span><strong class="stat-value">${x[1]}</strong></div>`).join("");
+ drawBarChart("globalResultChart",["莊","閒","和"],[all.b,all.p,all.t],`跨牌靴結果（${shoes.length} 靴／${all.total} 局）`);
+ analyticsMatchCount.textContent=`顯示 ${shoes.length} 靴`;
+ shoeAnalyticsList.innerHTML=shoes.length?`<div class="analytics-row header"><div>牌靴</div><div>局數</div><div>莊率</div><div>閒率</div><div>和率</div><div>最長連續</div></div>`+shoes.map(s=>{
+  const c=counts(s.games),st=streaksFor(s.games),br=Number(calcRate(c.b,c.total)),pr=Number(calcRate(c.p,c.total));
+  return`<div class="analytics-row"><div class="analytics-shoe"><strong>${s.id}${s.name?`｜${escapeHtml(s.name)}`:""}</strong><small>${s.status==="open"?"進行中":"已結束"}｜${formatDate(s.createdAt)}</small></div><div>${c.total} 局</div><div>莊 ${calcRate(c.b,c.total)}%<div class="rate-bar"><span style="width:${br}%"></span></div></div><div>閒 ${calcRate(c.p,c.total)}%<div class="rate-bar"><span style="width:${pr}%"></span></div></div><div>和 ${calcRate(c.t,c.total)}%</div><div>莊 ${st.maxB}｜閒 ${st.maxP}</div></div>`;
+ }).join(""):`<div class="analytics-empty">沒有符合條件的牌靴</div>`;
+}
+function exportAllCsv(){
+ const rows=[["牌靴編號","牌靴名稱","狀態","建立時間","結束時間","局數","莊點數","閒點數","勝方","差值","牌局時間"]];
+ data.shoes.forEach(s=>{if(!s.games.length)rows.push([s.id,s.name,s.status,s.createdAt,s.finishedAt||"",0,"","","","",""]);else s.games.forEach((g,i)=>rows.push([s.id,s.name,s.status,s.createdAt,s.finishedAt||"",i+1,g.banker,g.player,g.winner,g.difference,g.createdAt]))});
+ download("baccarat_v12_all_shoes.csv",rows.map(r=>r.map(csvEscape).join(",")).join("\n"),"text/csv;charset=utf-8");
+}
+function renderAll(){renderCurrentShoeInfo();updateStats();updateRecent();updateStreaks();renderBeadRoad();renderRoads();updateDifference();drawCharts();showHistory();renderShoeHistory();renderGlobalAnalytics()}
+
 
 addButton.addEventListener("click",addGame);undoButton.addEventListener("click",undoLastGame);redoButton.addEventListener("click",redoLastGame);clearButton.addEventListener("click",clearAllGames);newShoeButton.addEventListener("click",startNewShoe);finishShoeButton.addEventListener("click",finishCurrentShoe);
 showShoeHistoryButton.addEventListener("click",()=>{shoeHistoryPanel.hidden=!shoeHistoryPanel.hidden;if(!shoeHistoryPanel.hidden)renderShoeHistory()});closeShoeHistoryButton.addEventListener("click",()=>shoeHistoryPanel.hidden=true);
 shoeHistoryList.addEventListener("click",e=>{const b=e.target.closest("button[data-action]");if(!b)return;const{action,id}=b.dataset;if(action==="switch")switchShoe(id);if(action==="reopen")reopenShoe(id);if(action==="delete")deleteShoe(id)});
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&(document.activeElement===banker||document.activeElement===player))addGame()});historySearch.addEventListener("input",showHistory);
 sessionName.addEventListener("input",()=>{getCurrentShoe().name=sessionName.value;saveData();renderCurrentShoeInfo();renderShoeHistory()});themeButton.addEventListener("click",()=>{document.body.classList.toggle("light");localStorage.setItem(THEME_KEY,document.body.classList.contains("light")?"light":"dark")});if(localStorage.getItem(THEME_KEY)==="light")document.body.classList.add("light");
+[analyticsScope,shoeAnalyticsSearch,shoeStatusFilter,minimumStreakFilter,shoeSort].forEach(el=>el.addEventListener(el.tagName==="INPUT"?"input":"change",renderGlobalAnalytics));
+exportAllCsvButton.addEventListener("click",exportAllCsv);
 exportCsvButton.addEventListener("click",exportCsv);importCsvInput.addEventListener("change",e=>{if(e.target.files[0])importCsv(e.target.files[0]);e.target.value=""});exportJsonButton.addEventListener("click",exportJson);importJsonInput.addEventListener("change",e=>{if(e.target.files[0])importJson(e.target.files[0]);e.target.value=""});
 syncCurrent();renderAll();banker.focus();
