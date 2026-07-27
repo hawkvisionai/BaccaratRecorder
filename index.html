@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>百家樂分析器 v11.0</title>
+  <title>百家樂分析器 v12.0</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main class="container">
     <header class="app-header">
-      <div><h1>百家樂分析器</h1><p class="subtitle">v11.0｜統計、路單與牌靴管理工具，不代表能預測下一局</p></div>
+      <div><h1>百家樂分析器</h1><p class="subtitle">v12.0｜新增跨牌靴統計與條件篩選，不代表能預測下一局</p></div>
       <button id="themeButton" class="ghost-button" type="button">切換明暗</button>
     </header>
 
@@ -27,6 +27,41 @@
         <div class="section-title-row"><h3>歷史牌靴</h3><button id="closeShoeHistoryButton" class="ghost-button compact-button" type="button">關閉</button></div>
         <div id="shoeHistoryList"></div>
       </div>
+    </section>
+
+    <section class="panel analytics-panel">
+      <div class="section-title-row">
+        <div><h2>跨牌靴統計</h2><p class="hint">彙整多個牌靴的歷史結果與連續走勢</p></div>
+        <select id="analyticsScope" class="analytics-control" aria-label="統計範圍">
+          <option value="all">全部牌靴</option>
+          <option value="10">最近 10 靴</option>
+          <option value="50">最近 50 靴</option>
+          <option value="100">最近 100 靴</option>
+          <option value="500">最近 500 靴</option>
+          <option value="1000">最近 1000 靴</option>
+        </select>
+      </div>
+      <div class="analytics-filters">
+        <input id="shoeAnalyticsSearch" class="analytics-control" type="search" placeholder="搜尋牌靴編號或名稱">
+        <select id="shoeStatusFilter" class="analytics-control" aria-label="牌靴狀態">
+          <option value="all">全部狀態</option>
+          <option value="open">進行中</option>
+          <option value="finished">已結束</option>
+        </select>
+        <input id="minimumStreakFilter" class="analytics-control" type="number" min="0" max="100" value="0" inputmode="numeric" placeholder="最短連續局數">
+        <select id="shoeSort" class="analytics-control" aria-label="排序方式">
+          <option value="newest">最新優先</option>
+          <option value="oldest">最舊優先</option>
+          <option value="gamesDesc">局數多到少</option>
+          <option value="bankerRateDesc">莊率高到低</option>
+          <option value="playerRateDesc">閒率高到低</option>
+        </select>
+      </div>
+      <p class="hint filter-hint">「最短連續局數」會篩選曾出現同一方連續達指定局數的牌靴。</p>
+      <div id="globalStats" class="stat-grid global-stat-grid"></div>
+      <canvas id="globalResultChart" width="900" height="320"></canvas>
+      <div class="section-title-row analytics-list-title"><h3>牌靴比較</h3><span id="analyticsMatchCount" class="hint"></span></div>
+      <div id="shoeAnalyticsList" class="analytics-list"></div>
     </section>
 
     <section class="panel">
@@ -54,7 +89,7 @@
     <section class="panel" data-feature="difference"><h2>點數差值分析</h2><div id="differenceStats" class="difference-grid"></div></section>
     <section class="panel" data-feature="charts"><h2>圖表</h2><canvas id="resultChart" width="900" height="320"></canvas><canvas id="differenceChart" width="900" height="320"></canvas></section>
 
-    <section class="panel" data-feature="transfer"><h2>資料匯入與匯出</h2><div class="button-row"><button id="exportCsvButton" class="secondary-button" type="button">匯出目前牌靴 CSV</button><label class="file-button">匯入 CSV 到目前牌靴<input id="importCsvInput" type="file" accept=".csv,text/csv"></label></div><div class="button-row"><button id="exportJsonButton" class="secondary-button" type="button">備份全部 JSON</button><label class="file-button">還原全部 JSON<input id="importJsonInput" type="file" accept=".json,application/json"></label></div></section>
+    <section class="panel" data-feature="transfer"><h2>資料匯入與匯出</h2><div class="button-row"><button id="exportCsvButton" class="secondary-button" type="button">匯出目前牌靴 CSV</button><label class="file-button">匯入 CSV 到目前牌靴<input id="importCsvInput" type="file" accept=".csv,text/csv"></label></div><div class="button-row"><button id="exportAllCsvButton" class="secondary-button" type="button">匯出全部牌靴 CSV</button><button id="exportJsonButton" class="secondary-button" type="button">備份全部 JSON</button><label class="file-button">還原全部 JSON<input id="importJsonInput" type="file" accept=".json,application/json"></label></div></section>
 
     <section class="panel"><div class="section-title-row"><h2>牌局紀錄</h2><input id="historySearch" class="history-search" type="search" placeholder="搜尋局數、莊、閒、和或點數"></div><div id="history"></div></section>
   </main>
