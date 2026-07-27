@@ -6,7 +6,7 @@ const THEME_KEY="baccaratAnalyzerTheme";
 let games=loadGames();
 let redoStack=[];
 
-const featureLevels={{stats:1,bead:2,bigroad:3,recent:4,streaks:5,difference:6,charts:7,transfer:8,derived:10}};
+const featureLevels={stats:1,bead:2,bigroad:3,recent:4,streaks:5,difference:6,charts:7,transfer:8,derived:10};
 document.querySelectorAll("[data-feature]").forEach(el=>{const f=el.dataset.feature;el.dataset.hidden=FEATURE_LEVEL<(featureLevels[f]||1)?"true":"false"});
 
 function addGame(){
