@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>百家樂分析器 v10.0</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="container">
+    <header class="app-header">
+      <div>
+        <h1>百家樂分析器</h1>
+        <p class="subtitle">v10.0｜統計與路單工具，不代表能預測下一局</p>
+      </div>
+      <button id="themeButton" class="ghost-button" type="button">切換明暗</button>
+    </header>
+
+    <section class="panel">
+      <div class="section-title-row">
+        <h2>輸入牌局</h2>
+        <input id="sessionName" class="session-name" type="text" maxlength="40" placeholder="牌靴名稱（選填）">
+      </div>
+
+      <div class="input-row">
+        <div class="input-group">
+          <label for="banker">莊點數</label>
+          <input type="number" id="banker" min="0" max="9" inputmode="numeric" placeholder="0～9">
+        </div>
+        <div class="input-group">
+          <label for="player">閒點數</label>
+          <input type="number" id="player" min="0" max="9" inputmode="numeric" placeholder="0～9">
+        </div>
+      </div>
+
+      <button class="primary-button" type="button" id="addButton">新增牌局</button>
+
+      <div class="button-row three">
+        <button class="secondary-button" type="button" id="undoButton">刪除上一局</button>
+        <button class="secondary-button" type="button" id="redoButton">復原刪除</button>
+        <button class="danger-button" type="button" id="clearButton">清除全部</button>
+      </div>
+
+      <p id="message"></p>
+    </section>
+
+    <section class="panel" data-feature="stats">
+      <h2>即時統計</h2>
+      <div id="stats" class="stat-grid"></div>
+    </section>
+
+    <section class="panel" data-feature="recent">
+      <h2>最近區間</h2>
+      <div id="recentStats" class="recent-grid"></div>
+    </section>
+
+    <section class="panel" data-feature="streaks">
+      <h2>連續走勢</h2>
+      <div id="streakStats" class="stat-grid"></div>
+    </section>
+
+    <section class="panel" data-feature="bead">
+      <div class="section-title-row">
+        <h2>珠盤路</h2>
+        <span class="hint">每欄由上往下 6 格</span>
+      </div>
+      <div class="road-scroll"><div id="beadRoad" class="road bead-road"></div></div>
+    </section>
+
+    <section class="panel" data-feature="bigroad">
+      <div class="section-title-row">
+        <h2>大路</h2>
+        <span class="hint">和局附加在前一個莊／閒結果上</span>
+      </div>
+      <div class="road-scroll"><div id="bigRoad" class="road grid-road"></div></div>
+    </section>
+
+    <section class="panel" data-feature="derived">
+      <h2>衍生路</h2>
+      <h3>大眼仔</h3>
+      <div class="road-scroll"><div id="bigEyeRoad" class="road mini-road"></div></div>
+      <h3>小路</h3>
+      <div class="road-scroll"><div id="smallRoad" class="road mini-road"></div></div>
+      <h3>曱甴路</h3>
+      <div class="road-scroll"><div id="cockroachRoad" class="road mini-road"></div></div>
+    </section>
+
+    <section class="panel" data-feature="difference">
+      <h2>點數差值分析</h2>
+      <div id="differenceStats" class="difference-grid"></div>
+    </section>
+
+    <section class="panel" data-feature="charts">
+      <h2>圖表</h2>
+      <canvas id="resultChart" width="900" height="320"></canvas>
+      <canvas id="differenceChart" width="900" height="320"></canvas>
+    </section>
+
+    <section class="panel" data-feature="transfer">
+      <h2>資料匯入與匯出</h2>
+      <div class="button-row">
+        <button id="exportCsvButton" class="secondary-button" type="button">匯出 CSV</button>
+        <label class="file-button">匯入 CSV<input id="importCsvInput" type="file" accept=".csv,text/csv"></label>
+      </div>
+      <div class="button-row">
+        <button id="exportJsonButton" class="secondary-button" type="button">備份 JSON</button>
+        <label class="file-button">還原 JSON<input id="importJsonInput" type="file" accept=".json,application/json"></label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="section-title-row">
+        <h2>牌局紀錄</h2>
+        <input id="historySearch" class="history-search" type="search" placeholder="搜尋局數、莊、閒、和或點數">
+      </div>
+      <div id="history"></div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
