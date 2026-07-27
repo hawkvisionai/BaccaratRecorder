@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="dark light" />
-  <title>Baccarat Platform Studio v13</title>
+  <title>Baccarat Platform Studio v13.2</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -12,19 +12,17 @@
     <header class="topbar">
       <div>
         <h1>Baccarat Platform Studio</h1>
-        <p>v13 快速輸入版｜牌靴資料即時寫入 Supabase</p>
+        <p>v13.2｜快速輸入＋選填完整記錄</p>
       </div>
       <button id="logoutButton" class="secondary hidden" type="button">登出</button>
     </header>
 
     <section id="loginPanel" class="card login-card">
       <h2>管理員登入</h2>
-      <label>
-        Email
+      <label>Email
         <input id="emailInput" type="email" autocomplete="username" placeholder="你的管理員 Email" />
       </label>
-      <label>
-        密碼
+      <label>密碼
         <input id="passwordInput" type="password" autocomplete="current-password" placeholder="你的密碼" />
       </label>
       <button id="loginButton" class="primary" type="button">登入</button>
@@ -33,35 +31,81 @@
 
     <section id="appPanel" class="hidden">
       <section class="card status-card">
-        <div>
-          <span class="eyebrow">目前牌靴</span>
-          <strong id="shoeNumber">尚未建立</strong>
-        </div>
-        <div>
-          <span class="eyebrow">目前局數</span>
-          <strong id="gameCount">0</strong>
-        </div>
-        <div>
-          <span class="eyebrow">同步狀態</span>
-          <strong id="syncStatus" class="status pending">準備中</strong>
-        </div>
+        <div><span class="eyebrow">目前牌靴</span><strong id="shoeNumber">尚未建立</strong></div>
+        <div><span class="eyebrow">下一局</span><strong id="nextGameNumber">第 1 局</strong></div>
+        <div><span class="eyebrow">同步狀態</span><strong id="syncStatus" class="status pending">準備中</strong></div>
       </section>
 
       <section class="card">
         <div class="section-head">
-          <h2>快速輸入</h2>
+          <div>
+            <h2>牌局輸入</h2>
+            <p class="section-note">只輸入點數即可；其他資料可自行決定是否記錄。</p>
+          </div>
           <span id="shoeState" class="badge">未開始</span>
         </div>
 
         <div class="point-grid">
-          <label>
-            莊點數
+          <label>莊點數
             <input id="bankerInput" type="number" min="0" max="9" inputmode="numeric" placeholder="0～9" />
           </label>
-          <label>
-            閒點數
+          <label>閒點數
             <input id="playerInput" type="number" min="0" max="9" inputmode="numeric" placeholder="0～9" />
           </label>
+        </div>
+
+        <button id="detailsToggle" class="details-toggle" type="button" aria-expanded="false">
+          ＋ 展開完整模式（選填）
+        </button>
+
+        <div id="detailsPanel" class="details-panel hidden">
+          <div class="detail-grid">
+            <label>莊對
+              <select id="bankerPair">
+                <option value="">未記錄</option><option value="false">沒有</option><option value="true">有</option>
+              </select>
+            </label>
+            <label>閒對
+              <select id="playerPair">
+                <option value="">未記錄</option><option value="false">沒有</option><option value="true">有</option>
+              </select>
+            </label>
+            <label>莊家牌數
+              <select id="bankerCardCount">
+                <option value="">未記錄</option><option value="2">2 張</option><option value="3">3 張</option>
+              </select>
+            </label>
+            <label>閒家牌數
+              <select id="playerCardCount">
+                <option value="">未記錄</option><option value="2">2 張</option><option value="3">3 張</option>
+              </select>
+            </label>
+            <label>莊自然牌
+              <select id="bankerNatural">
+                <option value="">未記錄</option><option value="false">不是</option><option value="true">是</option>
+              </select>
+            </label>
+            <label>閒自然牌
+              <select id="playerNatural">
+                <option value="">未記錄</option><option value="false">不是</option><option value="true">是</option>
+              </select>
+            </label>
+            <label>Super 6
+              <select id="superSix">
+                <option value="">未記錄</option><option value="false">不是</option><option value="true">是</option>
+              </select>
+            </label>
+          </div>
+
+          <label>備註
+            <textarea id="notesInput" maxlength="300" placeholder="選填，例如桌號、特殊狀況"></textarea>
+          </label>
+
+          <div class="helper-row">
+            <button id="autoFillButton" class="secondary compact" type="button">依點數與牌數自動填可判斷項目</button>
+            <button id="clearDetailsButton" class="secondary compact" type="button">清除完整模式</button>
+          </div>
+          <p class="hint">「未記錄」會存成空值，不會被誤認為「沒有」。</p>
         </div>
 
         <button id="addGameButton" class="primary large" type="button">新增牌局</button>
@@ -79,9 +123,7 @@
           <h2>最近 10 局</h2>
           <button id="refreshButton" class="secondary compact" type="button">重新整理</button>
         </div>
-        <div id="recentGames" class="recent-list">
-          <p class="empty">尚無牌局資料</p>
-        </div>
+        <div id="recentGames" class="recent-list"><p class="empty">尚無牌局資料</p></div>
       </section>
     </section>
   </main>
