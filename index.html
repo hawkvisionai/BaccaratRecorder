@@ -4,13 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="dark light" />
-  <title>Baccarat Platform Studio v14.4</title>
+  <title>Baccarat Platform Studio v14.5</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="container">
     <header class="topbar">
-      <div><h1>Baccarat Platform Studio</h1><p>v14.4｜和局修正版</p></div>
+      <div><h1>Baccarat Platform Studio</h1><p>v14.5｜牌桌位置版</p></div>
       <button id="logoutButton" class="secondary hidden" type="button">登出</button>
     </header>
 
@@ -47,29 +47,29 @@
 
         <div id="completePanel">
           <div class="point-grid">
-            <label>莊點數<input id="bankerInput" type="number" min="0" max="9" inputmode="numeric" placeholder="0～9" /></label>
             <label>閒點數<input id="playerInput" type="number" min="0" max="9" inputmode="numeric" placeholder="0～9" /></label>
+            <label>莊點數<input id="bankerInput" type="number" min="0" max="9" inputmode="numeric" placeholder="0～9" /></label>
           </div>
 
           <div class="toggle-grid">
-            <button id="bankerPair" class="check-toggle" type="button" aria-pressed="false">☐ 莊對</button>
             <button id="playerPair" class="check-toggle" type="button" aria-pressed="false">☐ 閒對</button>
-            <button id="bankerNatural" class="check-toggle" type="button" aria-pressed="false">☐ 莊自然牌</button>
+            <button id="bankerPair" class="check-toggle" type="button" aria-pressed="false">☐ 莊對</button>
             <button id="playerNatural" class="check-toggle" type="button" aria-pressed="false">☐ 閒自然牌</button>
+            <button id="bankerNatural" class="check-toggle" type="button" aria-pressed="false">☐ 莊自然牌</button>
             <button id="superSix" class="check-toggle" type="button" aria-pressed="false">☐ Super 6</button>
           </div>
 
           <div class="card-count-grid">
-            <div><span>莊家牌數</span><button id="bankerCardCount" class="count-toggle" type="button" data-value="2">2 張</button></div>
             <div><span>閒家牌數</span><button id="playerCardCount" class="count-toggle" type="button" data-value="2">2 張</button></div>
+            <div><span>莊家牌數</span><button id="bankerCardCount" class="count-toggle" type="button" data-value="2">2 張</button></div>
           </div>
 
           <button id="addGameButton" class="primary large" type="button">新增牌局</button>
         </div>
 
         <div id="winnerOnlyPanel" class="winner-only-panel hidden">
-          <button class="winner-button banker" type="button" data-winner="莊">莊</button>
           <button class="winner-button player" type="button" data-winner="閒">閒</button>
+          <button class="winner-button banker" type="button" data-winner="莊">莊</button>
           <button class="winner-button tie" type="button" data-winner="和">和</button>
         </div>
 
