@@ -4,13 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="dark light" />
-  <title>Baccarat Platform Studio v14.2</title>
+  <title>Baccarat Platform Studio v14.3</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="container">
     <header class="topbar">
-      <div><h1>Baccarat Platform Studio</h1><p>v14.2｜場館分類版</p></div>
+      <div><h1>Baccarat Platform Studio</h1><p>v14.3｜牌靴管理版</p></div>
       <button id="logoutButton" class="secondary hidden" type="button">登出</button>
     </header>
 
@@ -77,6 +77,7 @@
         <div class="action-grid">
           <button id="undoButton" class="secondary" type="button">刪除上一局</button>
           <button id="newShoeButton" class="success" type="button">新增牌靴</button>
+          <button id="manageShoesButton" class="warning" type="button">牌靴管理</button>
         </div>
       </section>
 
@@ -114,6 +115,55 @@
       <div class="modal-actions">
         <button id="cancelShoeButton" class="secondary" type="button">取消</button>
         <button id="confirmShoeButton" class="success" type="button">建立牌靴</button>
+      </div>
+    </section>
+  </div>
+
+
+  <div id="shoeManagerModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="shoeManagerTitle">
+    <div class="modal-backdrop" data-close-manager="true"></div>
+    <section class="modal-card manager-card">
+      <div class="section-head">
+        <div><h2 id="shoeManagerTitle">牌靴管理</h2><p class="section-note">查看、修改、封存或刪除牌靴。</p></div>
+        <button id="closeManagerModal" class="icon-button" type="button" aria-label="關閉">×</button>
+      </div>
+      <div class="manager-filters">
+        <input id="shoeSearchInput" type="search" placeholder="搜尋牌靴編號、名稱或場館" />
+        <select id="shoeStatusFilter">
+          <option value="active">正常牌靴</option>
+          <option value="archived">已封存</option>
+          <option value="all">全部</option>
+        </select>
+      </div>
+      <p id="managerMessage" class="message"></p>
+      <div id="shoeManagerList" class="shoe-manager-list"><p class="empty">讀取中…</p></div>
+    </section>
+  </div>
+
+  <div id="shoeDetailModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="shoeDetailTitle">
+    <div class="modal-backdrop" data-close-detail="true"></div>
+    <section class="modal-card manager-card">
+      <div class="section-head">
+        <div><h2 id="shoeDetailTitle">牌靴內容</h2><p id="shoeDetailMeta" class="section-note"></p></div>
+        <button id="closeDetailModal" class="icon-button" type="button" aria-label="關閉">×</button>
+      </div>
+      <div id="shoeDetailGames" class="recent-list"><p class="empty">讀取中…</p></div>
+    </section>
+  </div>
+
+  <div id="editShoeModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="editShoeTitle">
+    <div class="modal-backdrop" data-close-edit="true"></div>
+    <section class="modal-card">
+      <div class="section-head">
+        <div><h2 id="editShoeTitle">修改牌靴</h2><p class="section-note">可修改場館與牌靴名稱。</p></div>
+        <button id="closeEditModal" class="icon-button" type="button" aria-label="關閉">×</button>
+      </div>
+      <label>場館<select id="editVenueSelect"></select></label>
+      <label>牌靴名稱（選填）<input id="editShoeNameInput" type="text" maxlength="60" /></label>
+      <p id="editShoeMessage" class="message"></p>
+      <div class="modal-actions">
+        <button id="cancelEditShoeButton" class="secondary" type="button">取消</button>
+        <button id="saveEditShoeButton" class="success" type="button">儲存修改</button>
       </div>
     </section>
   </div>

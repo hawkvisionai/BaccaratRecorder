@@ -53,3 +53,16 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .default-venue-row input{display:inline-block;width:22px;height:22px;margin:0;accent-color:#16a34a}
 .modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
 @media(max-width:620px){.status-card{grid-template-columns:1fr 1fr}.status-card>div:last-child{grid-column:auto}.venue-input-row{grid-template-columns:1fr}.venue-input-row .secondary{width:100%}}
+
+/* v14.3 牌靴管理 */
+.manager-card{width:min(860px,100%)}
+.manager-filters{display:grid;grid-template-columns:1fr 180px;gap:10px;margin-bottom:8px}
+.manager-filters input,.manager-filters select{margin-top:0}
+.shoe-manager-list{display:grid;gap:10px}
+.shoe-manager-row{display:grid;grid-template-columns:minmax(120px,.8fr) minmax(130px,1fr) 80px 100px auto;gap:12px;align-items:center;background:var(--card2);border:1px solid var(--line);padding:13px;border-radius:14px}
+.shoe-manager-main strong{display:block;font-size:17px}.shoe-manager-main small,.shoe-manager-meta{color:var(--muted);line-height:1.5}
+.shoe-actions{display:flex;gap:7px;justify-content:flex-end;flex-wrap:wrap}.shoe-actions button{padding:8px 10px;font-size:13px}
+.danger{background:var(--red)}.archive{background:#7c3aed}.restore{background:#0f766e}
+.archived-row{opacity:.72}.active-shoe-marker{display:inline-block;margin-left:7px;padding:2px 7px;border-radius:999px;background:#166534;color:#dcfce7;font-size:11px}
+.detail-game-row{background:var(--card2);padding:12px;border-radius:12px;border:1px solid var(--line)}
+@media(max-width:760px){.manager-filters{grid-template-columns:1fr}.shoe-manager-row{grid-template-columns:1fr 1fr}.shoe-actions{grid-column:1/-1;justify-content:stretch}.shoe-actions button{flex:1}.shoe-manager-meta{text-align:right}}
