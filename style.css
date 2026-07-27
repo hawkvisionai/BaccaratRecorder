@@ -39,3 +39,17 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .save-toast.show{opacity:1;transform:translate(-50%,0)}
 .save-toast.success{background:#15803d}
 .save-toast.error{background:#b91c1c}
+
+
+/* v14.2 場館分類 */
+.status-card{grid-template-columns:repeat(4,1fr)}
+.modal{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;padding:18px}
+.modal-backdrop{position:absolute;inset:0;background:rgba(2,6,23,.78);backdrop-filter:blur(4px)}
+.modal-card{position:relative;width:min(520px,100%);max-height:calc(100vh - 36px);overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:0 24px 80px rgba(0,0,0,.55)}
+.icon-button{width:42px;height:42px;padding:0;border-radius:50%;background:#334155;font-size:28px;line-height:1}
+.venue-input-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end}
+.venue-input-row select{margin-top:8px}
+.default-venue-row{display:flex;align-items:center;gap:10px;margin:16px 0;font-weight:800}
+.default-venue-row input{display:inline-block;width:22px;height:22px;margin:0;accent-color:#16a34a}
+.modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+@media(max-width:620px){.status-card{grid-template-columns:1fr 1fr}.status-card>div:last-child{grid-column:auto}.venue-input-row{grid-template-columns:1fr}.venue-input-row .secondary{width:100%}}

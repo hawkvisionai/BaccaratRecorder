@@ -4,13 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="dark light" />
-  <title>Baccarat Platform Studio v14.1</title>
+  <title>Baccarat Platform Studio v14.2</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="container">
     <header class="topbar">
-      <div><h1>Baccarat Platform Studio</h1><p>v14.1｜儲存確認版</p></div>
+      <div><h1>Baccarat Platform Studio</h1><p>v14.2｜場館分類版</p></div>
       <button id="logoutButton" class="secondary hidden" type="button">登出</button>
     </header>
 
@@ -25,6 +25,7 @@
     <section id="appPanel" class="hidden">
       <section class="card status-card">
         <div><span class="eyebrow">目前牌靴</span><strong id="shoeNumber">尚未建立</strong></div>
+        <div><span class="eyebrow">目前場館</span><strong id="currentVenue">尚未選擇</strong></div>
         <div><span class="eyebrow">目前局數</span><strong id="nextGameNumber">第 1 局</strong></div>
         <div><span class="eyebrow">同步狀態</span><strong id="syncStatus" class="status pending">準備中</strong></div>
       </section>
@@ -85,6 +86,38 @@
       </section>
     </section>
   </main>
+
+  <div id="newShoeModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="newShoeTitle">
+    <div class="modal-backdrop" data-close-modal="true"></div>
+    <section class="modal-card">
+      <div class="section-head">
+        <div><h2 id="newShoeTitle">新增牌靴</h2><p class="section-note">場館只需每個牌靴選擇一次。</p></div>
+        <button id="closeShoeModal" class="icon-button" type="button" aria-label="關閉">×</button>
+      </div>
+      <label>場館
+        <div class="venue-input-row">
+          <select id="venueSelect"></select>
+          <button id="addVenueButton" class="secondary" type="button">＋ 新增</button>
+        </div>
+      </label>
+      <label>牌靴名稱（選填）
+        <input id="shoeNameInput" type="text" maxlength="60" placeholder="例如：晚場 A 桌" />
+      </label>
+      <label>開始記錄局數
+        <input id="startGameInput" type="number" min="1" inputmode="numeric" value="1" />
+      </label>
+      <label class="default-venue-row">
+        <input id="defaultVenueCheckbox" type="checkbox" />
+        <span>設為預設場館</span>
+      </label>
+      <p id="shoeModalMessage" class="message"></p>
+      <div class="modal-actions">
+        <button id="cancelShoeButton" class="secondary" type="button">取消</button>
+        <button id="confirmShoeButton" class="success" type="button">建立牌靴</button>
+      </div>
+    </section>
+  </div>
+
   <div id="saveToast" class="save-toast" role="status" aria-live="polite"></div>
   <script type="module" src="app.js"></script>
 </body>
