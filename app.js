@@ -22,6 +22,12 @@ let winnerOnlyState = freshWinnerOnlyState();
 let currentUser = null;
 let currentProfile = null;
 let managedUsers = [];
+let realtimeChannels = [];
+let realtimeReloadTimer = null;
+let realtimeManagerTimer = null;
+let realtimeReconnectTimer = null;
+let realtimeGeneration = 0;
+let realtimeJoinedCount = 0;
 
 const loginPanel = $("loginPanel");
 const appPanel = $("appPanel");
@@ -302,6 +308,88 @@ async function saveEditedShoe(){if(busy||!editingShoe)return;const venue=$("edit
 async function toggleArchiveShoe(shoe){const willArchive=!shoe.is_archived;if(willArchive&&currentShoe?.id===shoe.id&&!confirm(`這是目前進行中的 ${shoe.shoe_number}。封存後將無法繼續記錄，確定封存嗎？`))return;if(!willArchive&&!confirm(`確定復原 ${shoe.shoe_number} 嗎？`))return;setBusy(true);try{const updates={is_archived:willArchive,archived_at:willArchive?new Date().toISOString():null};if(willArchive&&shoe.status==="open"){updates.status="finished";updates.finished_at=new Date().toISOString()}const {data,error}=await supabase.from("shoes").update(updates).eq("id",shoe.id).select().single();if(error)throw error;allShoes=allShoes.map(s=>s.id===data.id?{...data,game_count:s.game_count||0}:s);if(currentShoe?.id===shoe.id&&willArchive){currentShoe=null;currentGames=[]}render();renderShoeManager();showSaveToast(willArchive?"✓ 牌靴已封存":"✓ 牌靴已復原")}catch(e){showMessage($("managerMessage"),e.message||"操作失敗","error")}finally{setBusy(false)}}
 async function deleteShoe(shoe){const {count,error:ce}=await supabase.from("games").select("id",{count:"exact",head:true}).eq("shoe_id",shoe.id);if(ce)return showMessage($("managerMessage"),ce.message||"無法確認牌局數","error");if(!confirm(`確定永久刪除 ${shoe.shoe_number}？\n場館：${shoe.venue||"未選場館"}\n共 ${count||0} 局\n\n此操作無法復原。`))return;setBusy(true);try{let r=await supabase.from("games").delete().eq("shoe_id",shoe.id);if(r.error)throw r.error;r=await supabase.from("shoes").delete().eq("id",shoe.id);if(r.error)throw r.error;allShoes=allShoes.filter(s=>s.id!==shoe.id);if(currentShoe?.id===shoe.id){currentShoe=null;currentGames=[]}render();renderShoeManager();showSaveToast("✓ 牌靴已永久刪除")}catch(e){showMessage($("managerMessage"),e.message||"刪除失敗","error")}finally{setBusy(false)}}
 async function deleteLastGame(){if(busy||!currentGames.length)return;const last=[...currentGames].sort((a,b)=>a.game_number-b.game_number).at(-1);if(!confirm(`確定刪除第 ${last.game_number} 局嗎？`))return;setBusy(true);try{setSync("同步中");const {error}=await supabase.from("games").delete().eq("id",last.id);if(error)throw error;currentGames=currentGames.filter(g=>g.id!==last.id);setSync("已同步","ok");showMessage(appMessage,"上一局已刪除","success")}catch(e){setSync("同步失敗","error");showMessage(appMessage,e.message||"刪除失敗","error")}finally{setBusy(false);render()}}
+
+function isModalOpen(id){
+  const el=$(id); return !!el && !el.classList.contains("hidden");
+}
+function scheduleRealtimeReload(reason="資料更新"){
+  if(!currentUser)return;
+  clearTimeout(realtimeReloadTimer);
+  realtimeReloadTimer=setTimeout(async()=>{
+    try{
+      await loadCloudData();
+      if(reason) showSaveToast(`↻ ${reason}`);
+    }catch(e){
+      console.error("Realtime reload failed",e);
+      setSync("同步失敗","error");
+    }
+  },220);
+}
+function scheduleManagerReload(kind){
+  if(currentProfile?.role!=="admin")return;
+  clearTimeout(realtimeManagerTimer);
+  realtimeManagerTimer=setTimeout(async()=>{
+    try{
+      if(kind==="shoes" && isModalOpen("shoeManagerModal")) await openShoeManager();
+      if(kind==="users" && isModalOpen("userManagerModal")) await loadManagedUsers();
+    }catch(e){console.error("Realtime manager refresh failed",e)}
+  },320);
+}
+async function stopRealtime(){
+  realtimeGeneration+=1;
+  clearTimeout(realtimeReloadTimer);clearTimeout(realtimeManagerTimer);clearTimeout(realtimeReconnectTimer);
+  const channels=[...realtimeChannels];realtimeChannels=[];realtimeJoinedCount=0;
+  await Promise.all(channels.map(channel=>supabase.removeChannel(channel).catch(()=>null)));
+}
+function updateRealtimeConnection(status,generation){
+  if(generation!==realtimeGeneration)return;
+  if(status==="SUBSCRIBED"){
+    realtimeJoinedCount+=1;
+    if(realtimeJoinedCount>=realtimeChannels.length)setSync("即時連線","ok");
+    return;
+  }
+  if(status==="CHANNEL_ERROR"||status==="TIMED_OUT"||status==="CLOSED"){
+    setSync(navigator.onLine?"重新連線中":"已離線",navigator.onLine?"pending":"error");
+    clearTimeout(realtimeReconnectTimer);
+    if(navigator.onLine)realtimeReconnectTimer=setTimeout(()=>startRealtime(),1800);
+  }
+}
+async function startRealtime(){
+  if(!currentUser)return;
+  await stopRealtime();
+  const generation=realtimeGeneration;
+  realtimeJoinedCount=0;
+  setSync(navigator.onLine?"連線中":"已離線",navigator.onLine?"pending":"error");
+
+  const dataChannel=supabase.channel(`studio-data-${currentUser.id}-${generation}`)
+    .on("postgres_changes",{event:"*",schema:"public",table:"shoes"},payload=>{
+      scheduleRealtimeReload(payload.eventType==="INSERT"?"牌靴已建立":"牌靴狀態已更新");
+      scheduleManagerReload("shoes");
+    })
+    .on("postgres_changes",{event:"*",schema:"public",table:"games"},payload=>{
+      const changedShoe=payload.new?.shoe_id||payload.old?.shoe_id;
+      if(!currentShoe||String(changedShoe)===String(currentShoe.id))scheduleRealtimeReload("牌局已同步");
+      scheduleManagerReload("shoes");
+    })
+    .subscribe(status=>updateRealtimeConnection(status,generation));
+
+  const profileFilter=currentProfile?.role==="admin"?undefined:`id=eq.${currentUser.id}`;
+  const profileConfig={event:"*",schema:"public",table:"profiles"};
+  if(profileFilter)profileConfig.filter=profileFilter;
+  const profileChannel=supabase.channel(`studio-profiles-${currentUser.id}-${generation}`)
+    .on("postgres_changes",profileConfig,async payload=>{
+      scheduleManagerReload("users");
+      if(String(payload.new?.id||payload.old?.id)===String(currentUser.id)){
+        try{currentProfile=await loadCurrentProfile(currentUser);applyRoleUI()}catch(e){console.error(e)}
+      }
+    })
+    .subscribe(status=>updateRealtimeConnection(status,generation));
+
+  realtimeChannels=[dataChannel,profileChannel];
+}
+window.addEventListener("offline",()=>setSync("已離線","error"));
+window.addEventListener("online",()=>{setSync("重新連線中","pending");startRealtime()});
+
 function usernameToInternalEmail(value){
   const account=String(value||"").trim().toLowerCase();
   return account.includes("@")?account:`${account}@baccarat.local`;
@@ -345,12 +433,13 @@ async function showAuthenticated(session){
     loginPanel.classList.add("hidden");appPanel.classList.remove("hidden");userArea.classList.remove("hidden");
     applyRoleUI();
     await Promise.all([loadCloudData(),loadVenues()]);
+    await startRealtime();
   }catch(e){
     console.error(e);showMessage(loginMessage,e.message||"登入資料讀取失敗","error");
     loginPanel.classList.remove("hidden");appPanel.classList.add("hidden");userArea.classList.add("hidden");
   }
 }
-function showLoggedOut(){loginPanel.classList.remove("hidden");appPanel.classList.add("hidden");userArea.classList.add("hidden");currentUser=null;currentProfile=null;currentShoe=null;currentGames=[]}
+function showLoggedOut(){stopRealtime();loginPanel.classList.remove("hidden");appPanel.classList.add("hidden");userArea.classList.add("hidden");currentUser=null;currentProfile=null;currentShoe=null;currentGames=[];setSync("準備中","pending")}
 
 
 async function callUserAdmin(action,payload={}){
