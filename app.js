@@ -293,10 +293,23 @@ async function saveEditedShoe(){if(busy||!editingShoe)return;const venue=$("edit
 async function toggleArchiveShoe(shoe){const willArchive=!shoe.is_archived;if(willArchive&&currentShoe?.id===shoe.id&&!confirm(`這是目前進行中的 ${shoe.shoe_number}。封存後將無法繼續記錄，確定封存嗎？`))return;if(!willArchive&&!confirm(`確定復原 ${shoe.shoe_number} 嗎？`))return;setBusy(true);try{const updates={is_archived:willArchive,archived_at:willArchive?new Date().toISOString():null};if(willArchive&&shoe.status==="open"){updates.status="finished";updates.finished_at=new Date().toISOString()}const {data,error}=await supabase.from("shoes").update(updates).eq("id",shoe.id).select().single();if(error)throw error;allShoes=allShoes.map(s=>s.id===data.id?{...data,game_count:s.game_count||0}:s);if(currentShoe?.id===shoe.id&&willArchive){currentShoe=null;currentGames=[]}render();renderShoeManager();showSaveToast(willArchive?"✓ 牌靴已封存":"✓ 牌靴已復原")}catch(e){showMessage($("managerMessage"),e.message||"操作失敗","error")}finally{setBusy(false)}}
 async function deleteShoe(shoe){const {count,error:ce}=await supabase.from("games").select("id",{count:"exact",head:true}).eq("shoe_id",shoe.id);if(ce)return showMessage($("managerMessage"),ce.message||"無法確認牌局數","error");if(!confirm(`確定永久刪除 ${shoe.shoe_number}？\n場館：${shoe.venue||"未選場館"}\n共 ${count||0} 局\n\n此操作無法復原。`))return;setBusy(true);try{let r=await supabase.from("games").delete().eq("shoe_id",shoe.id);if(r.error)throw r.error;r=await supabase.from("shoes").delete().eq("id",shoe.id);if(r.error)throw r.error;allShoes=allShoes.filter(s=>s.id!==shoe.id);if(currentShoe?.id===shoe.id){currentShoe=null;currentGames=[]}render();renderShoeManager();showSaveToast("✓ 牌靴已永久刪除")}catch(e){showMessage($("managerMessage"),e.message||"刪除失敗","error")}finally{setBusy(false)}}
 async function deleteLastGame(){if(busy||!currentGames.length)return;const last=[...currentGames].sort((a,b)=>a.game_number-b.game_number).at(-1);if(!confirm(`確定刪除第 ${last.game_number} 局嗎？`))return;setBusy(true);try{setSync("同步中");const {error}=await supabase.from("games").delete().eq("id",last.id);if(error)throw error;currentGames=currentGames.filter(g=>g.id!==last.id);setSync("已同步","ok");showMessage(appMessage,"上一局已刪除","success")}catch(e){setSync("同步失敗","error");showMessage(appMessage,e.message||"刪除失敗","error")}finally{setBusy(false);render()}}
-async function login(){if(busy)return;const email=$("emailInput").value.trim(),password=$("passwordInput").value;if(!email||!password)return showMessage(loginMessage,"請輸入 Email 和密碼","error");setBusy(true);try{const {error}=await supabase.auth.signInWithPassword({email,password});if(error)throw error}catch{showMessage(loginMessage,"登入失敗，請確認帳號或密碼","error")}finally{setBusy(false)}}
+function usernameToInternalEmail(value){
+  const account=String(value||"").trim().toLowerCase();
+  return account.includes("@")?account:`${account}@baccarat.local`;
+}
+async function login(){
+  if(busy)return;
+  const account=$("emailInput").value.trim(),password=$("passwordInput").value;
+  if(!account||!password)return showMessage(loginMessage,"請輸入帳號和密碼","error");
+  const email=usernameToInternalEmail(account);
+  setBusy(true);
+  try{const {error}=await supabase.auth.signInWithPassword({email,password});if(error)throw error}
+  catch{showMessage(loginMessage,"登入失敗，請確認帳號或密碼","error")}
+  finally{setBusy(false)}
+}
 async function logout(){await supabase.auth.signOut()}
 async function loadCurrentProfile(user){
-  const {data,error}=await supabase.from("profiles").select("id,email,display_name,role,is_active").eq("id",user.id).maybeSingle();
+  const {data,error}=await supabase.from("profiles").select("id,email,username,display_name,role,is_active").eq("id",user.id).maybeSingle();
   if(error) throw error;
   if(!data) throw new Error("找不到使用者資料，請先執行 v16.1.0 資料庫升級 SQL");
   if(data.is_active===false){await supabase.auth.signOut();throw new Error("此帳號已被停用，請聯絡管理員");}
@@ -354,15 +367,16 @@ async function loadManagedUsers(){
 function renderManagedUsers(){
   $("userManagerList").innerHTML=managedUsers.length?managedUsers.map(u=>{
     const admin=u.role==="admin",self=u.id===currentUser?.id,active=u.is_active!==false;
-    return `<div class="user-manager-row"><div><strong>${escapeHtml(u.display_name||u.email)}</strong><small>${escapeHtml(u.email)}</small></div><span class="role-badge ${admin?"admin":"recorder"}">${admin?"管理員":"記錄員"}</span><span class="account-state ${active?"active":"disabled"}">${active?"啟用":"停用"}</span><div class="user-actions">${admin?"":`<button class="secondary" data-user-action="password" data-id="${u.id}">重設密碼</button><button class="${active?"danger":"success"}" data-user-action="active" data-id="${u.id}">${active?"停用":"啟用"}</button>`}${self?'<span class="self-label">目前帳號</span>':""}</div></div>`
+    return `<div class="user-manager-row"><div><strong>${escapeHtml(u.display_name||u.email)}</strong><small>${escapeHtml(u.username||u.email)}</small></div><span class="role-badge ${admin?"admin":"recorder"}">${admin?"管理員":"記錄員"}</span><span class="account-state ${active?"active":"disabled"}">${active?"啟用":"停用"}</span><div class="user-actions">${admin?"":`<button class="secondary" data-user-action="password" data-id="${u.id}">重設密碼</button><button class="${active?"danger":"success"}" data-user-action="active" data-id="${u.id}">${active?"停用":"啟用"}</button>`}${self?'<span class="self-label">目前帳號</span>':""}</div></div>`
   }).join(""):'<p class="empty">尚無人員資料</p>';
   document.querySelectorAll("[data-user-action]").forEach(b=>b.onclick=()=>handleManagedUserAction(b.dataset.userAction,b.dataset.id));
 }
 async function createManagedUser(){
   if(busy)return;
-  const display_name=$("newUserName").value.trim(),email=$("newUserEmail").value.trim(),password=$("newUserPassword").value;
-  if(!display_name||!email||password.length<8)return showMessage($("userManagerMessage"),"請填寫名稱、Email，密碼至少 8 碼","error");
-  setBusy(true);try{await callUserAdmin("create",{display_name,email,password});$("newUserName").value="";$("newUserEmail").value="";$("newUserPassword").value="";showSaveToast("✓ 記錄員已建立");await loadManagedUsers()}
+  const display_name=$("newUserName").value.trim(),username=$("newUsername").value.trim().toLowerCase(),password=$("newUserPassword").value;
+  if(!display_name||!username||password.length<8)return showMessage($("userManagerMessage"),"請填寫名稱、帳號，密碼至少 8 碼","error");
+  if(!/^[a-z0-9._-]{3,30}$/.test(username))return showMessage($("userManagerMessage"),"帳號限 3～30 碼小寫英文、數字、點、底線或連字號","error");
+  setBusy(true);try{await callUserAdmin("create",{display_name,username,password});$("newUserName").value="";$("newUsername").value="";$("newUserPassword").value="";showSaveToast("✓ 記錄員已建立");await loadManagedUsers()}
   catch(e){showMessage($("userManagerMessage"),e.message||"建立失敗","error")}finally{setBusy(false)}
 }
 async function handleManagedUserAction(action,id){

@@ -4,13 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="dark light" />
-  <title>Baccarat Platform Studio v16.1.1</title>
+  <title>Baccarat Platform Studio v16.1.1 帳號登入修正版</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="container">
     <header class="topbar">
-      <div><h1>Baccarat Platform Studio</h1><p>v16.1.1｜人員管理</p></div>
+      <div><h1>Baccarat Platform Studio</h1><p>v16.1.1｜帳號登入與人員管理</p></div>
       <div id="userArea" class="user-area hidden">
         <div class="user-meta"><strong id="userDisplayName">—</strong><span id="userRoleBadge" class="role-badge">—</span></div>
         <button id="userManagerButton" class="warning hidden" type="button">人員管理</button>
@@ -20,7 +20,7 @@
 
     <section id="loginPanel" class="card login-card">
       <h2>人員登入</h2>
-      <label>帳號（Email）<input id="emailInput" type="email" autocomplete="username" placeholder="請輸入帳號" /></label>
+      <label>帳號<input id="emailInput" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="管理員可用 Email；記錄員輸入帳號" /></label>
       <label>密碼<input id="passwordInput" type="password" autocomplete="current-password" placeholder="你的密碼" /></label>
       <button id="loginButton" class="primary" type="button">登入</button>
       <p id="loginMessage" class="message"></p><p class="login-note">帳號由管理員建立，不開放自行註冊。</p>
@@ -132,7 +132,7 @@
       <div class="section-head"><div><h2 id="userManagerTitle">人員管理</h2><p class="section-note">只有管理員可以建立、停用及重設記錄員帳號。</p></div><button id="closeUserManagerModal" class="icon-button" type="button" aria-label="關閉">×</button></div>
       <div class="user-create-grid">
         <label>顯示名稱<input id="newUserName" type="text" maxlength="40" placeholder="例如：小王" /></label>
-        <label>Email<input id="newUserEmail" type="email" autocomplete="off" placeholder="recorder@example.com" /></label>
+        <label>登入帳號<input id="newUsername" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="30" placeholder="例如：recorder01" /></label>
         <label>初始密碼<input id="newUserPassword" type="password" autocomplete="new-password" minlength="8" placeholder="至少 8 碼" /></label>
         <button id="createUserButton" class="success" type="button">建立記錄員</button>
       </div>
