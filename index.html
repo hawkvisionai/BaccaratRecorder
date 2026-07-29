@@ -4,22 +4,25 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="dark light" />
-  <title>Baccarat Platform Studio v15.0</title>
+  <title>Baccarat Platform Studio v16.1.0</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="container">
     <header class="topbar">
-      <div><h1>Baccarat Platform Studio</h1><p>v15.0｜智慧記錄</p></div>
-      <button id="logoutButton" class="secondary hidden" type="button">登出</button>
+      <div><h1>Baccarat Platform Studio</h1><p>v16.1.0｜多人登入與權限基礎</p></div>
+      <div id="userArea" class="user-area hidden">
+        <div class="user-meta"><strong id="userDisplayName">—</strong><span id="userRoleBadge" class="role-badge">—</span></div>
+        <button id="logoutButton" class="secondary" type="button">登出</button>
+      </div>
     </header>
 
     <section id="loginPanel" class="card login-card">
-      <h2>管理員登入</h2>
-      <label>Email<input id="emailInput" type="email" autocomplete="username" placeholder="你的管理員 Email" /></label>
+      <h2>人員登入</h2>
+      <label>帳號（Email）<input id="emailInput" type="email" autocomplete="username" placeholder="請輸入帳號" /></label>
       <label>密碼<input id="passwordInput" type="password" autocomplete="current-password" placeholder="你的密碼" /></label>
       <button id="loginButton" class="primary" type="button">登入</button>
-      <p id="loginMessage" class="message"></p>
+      <p id="loginMessage" class="message"></p><p class="login-note">帳號由管理員建立，不開放自行註冊。</p>
     </section>
 
     <section id="appPanel" class="hidden">

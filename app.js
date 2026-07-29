@@ -18,12 +18,15 @@ let allShoes = [];
 let editingShoe = null;
 let cardState = freshCardState();
 let winnerOnlyState = freshWinnerOnlyState();
+let currentUser = null;
+let currentProfile = null;
 
 const loginPanel = $("loginPanel");
 const appPanel = $("appPanel");
 const logoutButton = $("logoutButton");
 const loginMessage = $("loginMessage");
 const appMessage = $("appMessage");
+const userArea = $("userArea");
 
 function freshCardState(){
   return { player:[null,null,null], banker:[null,null,null], active:"player0" };
@@ -290,8 +293,39 @@ async function deleteShoe(shoe){const {count,error:ce}=await supabase.from("game
 async function deleteLastGame(){if(busy||!currentGames.length)return;const last=[...currentGames].sort((a,b)=>a.game_number-b.game_number).at(-1);if(!confirm(`確定刪除第 ${last.game_number} 局嗎？`))return;setBusy(true);try{setSync("同步中");const {error}=await supabase.from("games").delete().eq("id",last.id);if(error)throw error;currentGames=currentGames.filter(g=>g.id!==last.id);setSync("已同步","ok");showMessage(appMessage,"上一局已刪除","success")}catch(e){setSync("同步失敗","error");showMessage(appMessage,e.message||"刪除失敗","error")}finally{setBusy(false);render()}}
 async function login(){if(busy)return;const email=$("emailInput").value.trim(),password=$("passwordInput").value;if(!email||!password)return showMessage(loginMessage,"請輸入 Email 和密碼","error");setBusy(true);try{const {error}=await supabase.auth.signInWithPassword({email,password});if(error)throw error}catch{showMessage(loginMessage,"登入失敗，請確認帳號或密碼","error")}finally{setBusy(false)}}
 async function logout(){await supabase.auth.signOut()}
-async function showAuthenticated(){loginPanel.classList.add("hidden");appPanel.classList.remove("hidden");logoutButton.classList.remove("hidden");try{await Promise.all([loadCloudData(),loadVenues()])}catch(e){setSync("連線失敗","error");showMessage(appMessage,e.message||"讀取雲端資料失敗","error")}}
-function showLoggedOut(){loginPanel.classList.remove("hidden");appPanel.classList.add("hidden");logoutButton.classList.add("hidden");currentShoe=null;currentGames=[]}
+async function loadCurrentProfile(user){
+  const {data,error}=await supabase.from("profiles").select("id,email,display_name,role,is_active").eq("id",user.id).maybeSingle();
+  if(error) throw error;
+  if(!data) throw new Error("找不到使用者資料，請先執行 v16.1.0 資料庫升級 SQL");
+  if(data.is_active===false){await supabase.auth.signOut();throw new Error("此帳號已被停用，請聯絡管理員");}
+  return data;
+}
+function applyRoleUI(){
+  const isAdmin=currentProfile?.role==="admin";
+  $("userDisplayName").textContent=currentProfile?.display_name||currentProfile?.email||"使用者";
+  $("userRoleBadge").textContent=isAdmin?"管理員":"記錄員";
+  $("userRoleBadge").className=`role-badge ${isAdmin?"admin":"recorder"}`;
+  $("manageShoesButton").classList.toggle("hidden",!isAdmin);
+  if(!isAdmin && !document.getElementById("recorderNotice")){
+    const note=document.createElement("div");note.id="recorderNotice";note.className="recorder-note";
+    note.textContent="記錄員模式：可建立與記錄牌靴；牌靴管理功能僅限管理員。";
+    $("appMessage").insertAdjacentElement("afterend",note);
+  }
+  if(isAdmin) document.getElementById("recorderNotice")?.remove();
+}
+async function showAuthenticated(session){
+  currentUser=session.user;
+  try{
+    currentProfile=await loadCurrentProfile(session.user);
+    loginPanel.classList.add("hidden");appPanel.classList.remove("hidden");userArea.classList.remove("hidden");
+    applyRoleUI();
+    await Promise.all([loadCloudData(),loadVenues()]);
+  }catch(e){
+    console.error(e);showMessage(loginMessage,e.message||"登入資料讀取失敗","error");
+    loginPanel.classList.remove("hidden");appPanel.classList.add("hidden");userArea.classList.add("hidden");
+  }
+}
+function showLoggedOut(){loginPanel.classList.remove("hidden");appPanel.classList.add("hidden");userArea.classList.add("hidden");currentUser=null;currentProfile=null;currentShoe=null;currentGames=[]}
 
 $("modeComplete").onclick=()=>setMode("complete");
 $("modeWinnerOnly").onclick=()=>setMode("winner_only");
@@ -307,5 +341,5 @@ $("undoButton").onclick=deleteLastGame;$("refreshButton").onclick=async()=>{try{
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("editShoeModal").classList.contains("hidden"))return closeEditModal();if(!$("shoeDetailModal").classList.contains("hidden"))return closeDetailModal();if(!$("shoeManagerModal").classList.contains("hidden"))return closeManagerModal();if(!$("newShoeModal").classList.contains("hidden"))return closeShoeModal()}if(e.key==="Enter"&&!loginPanel.classList.contains("hidden"))login()});
 
 renderCardInput();updateWinnerOnlyUI();updateRecordState();
-supabase.auth.onAuthStateChange(async(_event,session)=>session?await showAuthenticated():showLoggedOut());
-const {data:{session}}=await supabase.auth.getSession();if(session)await showAuthenticated();else showLoggedOut();
+supabase.auth.onAuthStateChange(async(_event,session)=>session?await showAuthenticated(session):showLoggedOut());
+const {data:{session}}=await supabase.auth.getSession();if(session)await showAuthenticated(session);else showLoggedOut();
