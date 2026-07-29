@@ -52,7 +52,7 @@ function escapeHtml(value){
 }
 function setBusy(value){
   busy=value;
-  ["loginButton","nextRoundButton","undoButton","newShoeButton","refreshButton","modeComplete","modeWinnerOnly","confirmShoeButton","addVenueButton","manageShoesButton","saveEditShoeButton"].forEach(id=>{if($(id))$(id).disabled=value});
+  ["loginButton","nextRoundButton","undoButton","newShoeButton","refreshButton","modeComplete","modeWinnerOnly","confirmShoeButton","addVenueButton","manageShoesButton","saveEditShoeButton","finishShoeButton"].forEach(id=>{if($(id))$(id).disabled=value});
   document.querySelectorAll(".winner-button,.check-toggle,.rank-button").forEach(b=>b.disabled=value);
   updateRecordState();
 }
@@ -199,7 +199,8 @@ function render(){
   $("currentVenue").textContent=currentShoe?.venue||"尚未選擇";
   $("nextGameNumber").textContent=`第 ${next} 局`;
   if(document.activeElement!==$("gameNumberInput")) $("gameNumberInput").value=next;
-  $("shoeState").textContent=currentShoe?(currentShoe.status==="open"?"進行中":"已結束"):"未開始";
+  $("shoeState").textContent=currentShoe?(currentShoe.status==="open"?"進行中｜已鎖定":"已結束"):"未開始";
+  $("shoeOwner").textContent=currentShoe?(currentProfile?.display_name||currentProfile?.username||"目前帳號"):"—";
   const can=!!currentShoe&&currentShoe.status==="open"&&!busy;
   $("undoButton").disabled=!can||!currentGames.length;
   document.querySelectorAll(".winner-button").forEach(b=>b.disabled=!can);
@@ -224,28 +225,36 @@ function closeShoeModal(){if(!busy)$("newShoeModal").classList.add("hidden")}
 function addVenue(){const raw=prompt("請輸入場館名稱");if(raw===null)return;const venue=raw.trim();if(!venue)return showMessage($("shoeModalMessage"),"場館名稱不能空白","error");if(!venueOptions.includes(venue))venueOptions.push(venue);venueOptions.sort((a,b)=>a.localeCompare(b,"zh-Hant"));saveLocalVenues(venueOptions);renderVenueOptions(venue)}
 async function loadCloudData(){
   setSync("同步中");
-  const {data:shoes,error:se}=await supabase.from("shoes").select("*").eq("status","open").eq("is_archived",false).order("created_at",{ascending:false}).limit(1); if(se)throw se;
+  const {data:shoes,error:se}=await supabase.from("shoes").select("*").eq("status","open").eq("is_archived",false).eq("owner_id",currentUser.id).order("created_at",{ascending:false}).limit(1); if(se)throw se;
   currentShoe=shoes?.[0]||null;
   if(!currentShoe){currentGames=[];setSync("已連線","ok");render();return}
   const {data:games,error:ge}=await supabase.from("games").select("*").eq("shoe_id",currentShoe.id).order("game_number",{ascending:true}); if(ge)throw ge;
   currentGames=games||[];setSync("已同步","ok");render();
 }
-async function nextShoeNumber(){const {data,error}=await supabase.from("shoes").select("shoe_number");if(error)throw error;const max=(data||[]).reduce((m,r)=>Math.max(m,Number(String(r.shoe_number||"").replace(/\D/g,""))||0),0);return `S${String(max+1).padStart(6,"0")}`}
 async function createNewShoe(){
   if(busy)return;const venue=$("venueSelect").value.trim(),name=$("shoeNameInput").value.trim(),start=Number($("startGameInput").value);
   if(!venue)return showMessage($("shoeModalMessage"),"請先選擇或新增場館","error");
   if(!Number.isInteger(start)||start<1)return showMessage($("shoeModalMessage"),"開始局數必須是 1 以上的整數","error");
-  if(currentShoe?.status==="open"&&currentGames.length&&!confirm("建立新牌靴後，目前牌靴會自動結束。確定繼續嗎？"))return;
+  if(currentShoe?.status==="open"&&currentGames.length&&!confirm("建立新牌靴後，只會結束你自己目前的牌靴。確定繼續嗎？"))return;
   setBusy(true);
   try{
     setSync("同步中");
-    if(currentShoe?.status==="open"){const {error}=await supabase.from("shoes").update({status:"finished",finished_at:new Date().toISOString()}).eq("id",currentShoe.id);if(error)throw error}
-    const shoe_number=await nextShoeNumber();
-    const {data,error}=await supabase.from("shoes").insert({shoe_number,name,status:"open",venue}).select().single();if(error)throw error;
-    currentShoe=data;currentGames=[];if($("defaultVenueCheckbox").checked)localStorage.setItem(DEFAULT_VENUE_KEY,venue);if(!venueOptions.includes(venue))venueOptions.push(venue);saveLocalVenues(venueOptions);
-    resetRound({resetMode:true});$("gameNumberInput").value=start;setSync("已同步","ok");showMessage(appMessage,`已開始 ${shoe_number}｜${venue}｜從第 ${start} 局記錄`,"success");$("newShoeModal").classList.add("hidden");
+    const {data,error}=await supabase.rpc("create_my_shoe",{p_venue:venue,p_name:name||null});
+    if(error)throw error;
+    currentShoe=data;currentGames=[];
+    if($("defaultVenueCheckbox").checked)localStorage.setItem(DEFAULT_VENUE_KEY,venue);
+    if(!venueOptions.includes(venue))venueOptions.push(venue);saveLocalVenues(venueOptions);
+    resetRound({resetMode:true});$("gameNumberInput").value=start;setSync("已同步","ok");showMessage(appMessage,`已開始 ${data.shoe_number}｜${venue}｜由 ${currentProfile.display_name} 負責`,"success");$("newShoeModal").classList.add("hidden");
   }catch(e){console.error(e);setSync("同步失敗","error");showMessage($("shoeModalMessage"),e.message||"建立牌靴失敗","error")}
   finally{setBusy(false);render();$("gameNumberInput").value=start}
+}
+async function finishCurrentShoe(){
+  if(busy||!currentShoe||currentShoe.status!=="open")return;
+  if(!confirm(`確定完成 ${currentShoe.shoe_number}？完成後會鎖定，不能再新增牌局。`))return;
+  setBusy(true);
+  try{const {data,error}=await supabase.rpc("finish_my_shoe",{p_shoe_id:currentShoe.id});if(error)throw error;currentShoe=data;setSync("已同步","ok");showSaveToast("✓ 牌靴已完成並鎖定");render()}
+  catch(e){showMessage(appMessage,e.message||"完成牌靴失敗","error")}
+  finally{setBusy(false)}
 }
 async function saveAndNext(){
   if(busy||!currentShoe||currentShoe.status!=="open")return;
@@ -256,11 +265,11 @@ async function saveAndNext(){
   let game;
   if(mode==="complete"){
     const d=completeDerived();
-    game={shoe_id:currentShoe.id,game_number:gameNumber,record_status:"complete",...d,difference:d.banker_points-d.player_points,
+    game={shoe_id:currentShoe.id,recorded_by:currentUser.id,game_number:gameNumber,record_status:"complete",...d,difference:d.banker_points-d.player_points,
       player_card_1:cardState.player[0],player_card_2:cardState.player[1],player_card_3:cardState.player[2],
       banker_card_1:cardState.banker[0],banker_card_2:cardState.banker[1],banker_card_3:cardState.banker[2]};
   }else{
-    game={shoe_id:currentShoe.id,game_number:gameNumber,record_status:"winner_only",winner:winnerOnlyState.winner,
+    game={shoe_id:currentShoe.id,recorded_by:currentUser.id,game_number:gameNumber,record_status:"winner_only",winner:winnerOnlyState.winner,
       banker_points:null,player_points:null,difference:null,banker_pair:winnerOnlyState.bankerPair,player_pair:winnerOnlyState.playerPair,
       banker_card_count:null,player_card_count:null,banker_natural:false,player_natural:false,super_six:winnerOnlyState.winner==="莊"&&winnerOnlyState.superSix,
       player_card_1:null,player_card_2:null,player_card_3:null,banker_card_1:null,banker_card_2:null,banker_card_3:null};
@@ -276,11 +285,11 @@ function formatDate(value){if(!value)return"—";return new Intl.DateTimeFormat(
 function closeManagerModal(){if(!busy)$("shoeManagerModal").classList.add("hidden")}
 function closeDetailModal(){$("shoeDetailModal").classList.add("hidden")}
 function closeEditModal(){if(!busy){$("editShoeModal").classList.add("hidden");editingShoe=null}}
-async function openShoeManager(){if(busy)return;$("shoeManagerModal").classList.remove("hidden");$("managerMessage").textContent="";$("shoeManagerList").innerHTML='<p class="empty">讀取中…</p>';try{const {data,error}=await supabase.from("shoes").select("*").order("created_at",{ascending:false});if(error)throw error;const counts=await Promise.all((data||[]).map(async s=>{const {count}=await supabase.from("games").select("id",{count:"exact",head:true}).eq("shoe_id",s.id);return {...s,game_count:count||0}}));allShoes=counts;renderShoeManager()}catch(e){showMessage($("managerMessage"),e.message||"讀取牌靴失敗","error")}}
+async function openShoeManager(){if(busy)return;$("shoeManagerModal").classList.remove("hidden");$("managerMessage").textContent="";$("shoeManagerList").innerHTML='<p class="empty">讀取中…</p>';try{const {data,error}=await supabase.from("shoes").select("*").order("created_at",{ascending:false});if(error)throw error;const {data:people}=await supabase.from("profiles").select("id,display_name,username");const ownerMap=new Map((people||[]).map(p=>[p.id,p.display_name||p.username]));const counts=await Promise.all((data||[]).map(async s=>{const {count}=await supabase.from("games").select("id",{count:"exact",head:true}).eq("shoe_id",s.id);return {...s,owner_name:ownerMap.get(s.owner_id)||"未分配",game_count:count||0}}));allShoes=counts;renderShoeManager()}catch(e){showMessage($("managerMessage"),e.message||"讀取牌靴失敗","error")}}
 function filteredShoes(){const q=$("shoeSearchInput").value.trim().toLowerCase(),status=$("shoeStatusFilter").value;return allShoes.filter(s=>{const archived=!!s.is_archived;if(status==="active"&&archived)return false;if(status==="archived"&&!archived)return false;const text=[s.shoe_number,s.name,s.venue].filter(Boolean).join(" ").toLowerCase();return !q||text.includes(q)})}
 function renderShoeManager(){
   const list=filteredShoes();
-  $("shoeManagerList").innerHTML=list.length?list.map(s=>{const active=currentShoe?.id===s.id,archived=!!s.is_archived;return `<div class="shoe-manager-row ${archived?"archived-row":""}"><div class="shoe-manager-main"><strong>${escapeHtml(s.shoe_number||"未命名")}${active?'<span class="active-shoe-marker">目前</span>':""}</strong><small>${escapeHtml(s.name||"未填名稱")}</small></div><div><strong>${escapeHtml(s.venue||"未選場館")}</strong><div class="shoe-manager-meta">${archived?"已封存":s.status==="open"?"進行中":"已結束"}</div></div><div class="shoe-manager-meta">${Number(s.game_count)||"—"}</div><div class="shoe-manager-meta">${formatDate(s.created_at)}</div><div class="shoe-actions"><button class="secondary" data-action="view" data-id="${s.id}">查看</button><button class="warning" data-action="edit" data-id="${s.id}">修改</button><button class="${archived?"restore":"archive"}" data-action="archive" data-id="${s.id}">${archived?"復原":"封存"}</button><button class="danger" data-action="delete" data-id="${s.id}">刪除</button></div></div>`}).join(""):'<p class="empty">沒有符合條件的牌靴</p>';
+  $("shoeManagerList").innerHTML=list.length?list.map(s=>{const active=currentShoe?.id===s.id,archived=!!s.is_archived;return `<div class="shoe-manager-row ${archived?"archived-row":""}"><div class="shoe-manager-main"><strong>${escapeHtml(s.shoe_number||"未命名")}${active?'<span class="active-shoe-marker">目前</span>':""}</strong><small>${escapeHtml(s.name||"未填名稱")}</small></div><div><strong>${escapeHtml(s.venue||"未選場館")}</strong><div class="shoe-manager-meta">負責：${escapeHtml(s.owner_name||"未分配")}｜${archived?"已封存":s.status==="open"?"進行中":"已結束"}</div></div><div class="shoe-manager-meta">${Number(s.game_count)||"—"}</div><div class="shoe-manager-meta">${formatDate(s.created_at)}</div><div class="shoe-actions"><button class="secondary" data-action="view" data-id="${s.id}">查看</button><button class="warning" data-action="edit" data-id="${s.id}">修改</button><button class="${archived?"restore":"archive"}" data-action="archive" data-id="${s.id}">${archived?"復原":"封存"}</button><button class="danger" data-action="delete" data-id="${s.id}">刪除</button></div></div>`}).join(""):'<p class="empty">沒有符合條件的牌靴</p>';
   document.querySelectorAll("#shoeManagerList [data-action]").forEach(b=>b.onclick=()=>handleShoeAction(b.dataset.action,b.dataset.id));
 }
 async function handleShoeAction(action,id){const shoe=allShoes.find(s=>String(s.id)===String(id));if(!shoe)return;if(action==="view")return viewShoe(shoe);if(action==="edit")return openEditShoe(shoe);if(action==="archive")return toggleArchiveShoe(shoe);if(action==="delete")return deleteShoe(shoe)}
@@ -398,7 +407,7 @@ document.querySelectorAll(".winner-button").forEach(b=>b.onclick=()=>{winnerOnly
 $("winnerPlayerPair").onclick=()=>{winnerOnlyState.playerPair=!winnerOnlyState.playerPair;updateWinnerOnlyUI()};
 $("winnerBankerPair").onclick=()=>{winnerOnlyState.bankerPair=!winnerOnlyState.bankerPair;updateWinnerOnlyUI()};
 $("winnerSuperSix").onclick=()=>{if(winnerOnlyState.winner==="莊"){winnerOnlyState.superSix=!winnerOnlyState.superSix;updateWinnerOnlyUI()}};
-$("newShoeButton").onclick=openShoeModal;$("confirmShoeButton").onclick=createNewShoe;$("addVenueButton").onclick=addVenue;$("closeShoeModal").onclick=closeShoeModal;$("cancelShoeButton").onclick=closeShoeModal;document.querySelector("[data-close-modal]").onclick=closeShoeModal;
+$("newShoeButton").onclick=openShoeModal;$("finishShoeButton").onclick=finishCurrentShoe;$("confirmShoeButton").onclick=createNewShoe;$("addVenueButton").onclick=addVenue;$("closeShoeModal").onclick=closeShoeModal;$("cancelShoeButton").onclick=closeShoeModal;document.querySelector("[data-close-modal]").onclick=closeShoeModal;
 $("manageShoesButton").onclick=openShoeManager;$("closeManagerModal").onclick=closeManagerModal;document.querySelector("[data-close-manager]").onclick=closeManagerModal;$("shoeSearchInput").oninput=renderShoeManager;$("shoeStatusFilter").onchange=renderShoeManager;
 $("closeDetailModal").onclick=closeDetailModal;document.querySelector("[data-close-detail]").onclick=closeDetailModal;$("closeEditModal").onclick=closeEditModal;$("cancelEditShoeButton").onclick=closeEditModal;document.querySelector("[data-close-edit]").onclick=closeEditModal;$("saveEditShoeButton").onclick=saveEditedShoe;
 $("userManagerButton").onclick=openUserManager;$("closeUserManagerModal").onclick=closeUserManager;document.querySelector("[data-close-users]").onclick=closeUserManager;$("createUserButton").onclick=createManagedUser;$("refreshUsersButton").onclick=loadManagedUsers;

@@ -4,13 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="dark light" />
-  <title>Baccarat Platform Studio v16.1.1 帳號登入修正版</title>
+  <title>Baccarat Platform Studio v16.1.2 多人牌靴鎖定</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="container">
     <header class="topbar">
-      <div><h1>Baccarat Platform Studio</h1><p>v16.1.1｜帳號登入與人員管理</p></div>
+      <div><h1>Baccarat Platform Studio</h1><p>v16.1.2｜多人牌靴鎖定</p></div>
       <div id="userArea" class="user-area hidden">
         <div class="user-meta"><strong id="userDisplayName">—</strong><span id="userRoleBadge" class="role-badge">—</span></div>
         <button id="userManagerButton" class="warning hidden" type="button">人員管理</button>
@@ -31,7 +31,7 @@
         <div><span class="eyebrow">目前牌靴</span><strong id="shoeNumber">尚未建立</strong></div>
         <div><span class="eyebrow">目前場館</span><strong id="currentVenue">尚未選擇</strong></div>
         <div><span class="eyebrow">目前局數</span><strong id="nextGameNumber">第 1 局</strong></div>
-        <div><span class="eyebrow">同步狀態</span><strong id="syncStatus" class="status pending">準備中</strong></div>
+        <div><span class="eyebrow">負責人</span><strong id="shoeOwner">—</strong></div><div><span class="eyebrow">同步狀態</span><strong id="syncStatus" class="status pending">準備中</strong></div>
       </section>
 
       <section class="card">
@@ -74,7 +74,7 @@
         <p id="appMessage" class="message"></p>
         <div class="action-grid">
           <button id="undoButton" class="secondary" type="button">刪除上一局</button>
-          <button id="newShoeButton" class="success" type="button">新增牌靴</button>
+          <button id="newShoeButton" class="success" type="button">新增牌靴</button><button id="finishShoeButton" class="archive" type="button">完成牌靴</button>
           <button id="manageShoesButton" class="warning" type="button">牌靴管理</button>
         </div>
       </section>
@@ -89,7 +89,7 @@
   <div id="newShoeModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="newShoeTitle">
     <div class="modal-backdrop" data-close-modal="true"></div>
     <section class="modal-card">
-      <div class="section-head"><div><h2 id="newShoeTitle">新增牌靴</h2><p class="section-note">場館只需每個牌靴選擇一次。</p></div><button id="closeShoeModal" class="icon-button" type="button" aria-label="關閉">×</button></div>
+      <div class="section-head"><div><h2 id="newShoeTitle">新增牌靴</h2><p class="section-note">每位人員只會操作自己建立的進行中牌靴。</p></div><button id="closeShoeModal" class="icon-button" type="button" aria-label="關閉">×</button></div>
       <label>場館<div class="venue-input-row"><select id="venueSelect"></select><button id="addVenueButton" class="secondary" type="button">＋ 新增</button></div></label>
       <label>牌靴名稱（選填）<input id="shoeNameInput" type="text" maxlength="60" placeholder="例如：晚場 A 桌" /></label>
       <label>開始記錄局數<input id="startGameInput" type="number" min="1" inputmode="numeric" value="1" /></label>
