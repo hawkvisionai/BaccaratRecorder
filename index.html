@@ -4,15 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="dark light" />
-  <title>Baccarat Platform Studio v16.1.0</title>
+  <title>Baccarat Platform Studio v16.1.1</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="container">
     <header class="topbar">
-      <div><h1>Baccarat Platform Studio</h1><p>v16.1.0｜多人登入與權限基礎</p></div>
+      <div><h1>Baccarat Platform Studio</h1><p>v16.1.1｜人員管理</p></div>
       <div id="userArea" class="user-area hidden">
         <div class="user-meta"><strong id="userDisplayName">—</strong><span id="userRoleBadge" class="role-badge">—</span></div>
+        <button id="userManagerButton" class="warning hidden" type="button">人員管理</button>
         <button id="logoutButton" class="secondary" type="button">登出</button>
       </div>
     </header>
@@ -121,6 +122,23 @@
       <div class="section-head"><div><h2 id="editShoeTitle">修改牌靴</h2><p class="section-note">可修改場館與牌靴名稱。</p></div><button id="closeEditModal" class="icon-button" type="button" aria-label="關閉">×</button></div>
       <label>場館<select id="editVenueSelect"></select></label><label>牌靴名稱（選填）<input id="editShoeNameInput" type="text" maxlength="60" /></label>
       <p id="editShoeMessage" class="message"></p><div class="modal-actions"><button id="cancelEditShoeButton" class="secondary" type="button">取消</button><button id="saveEditShoeButton" class="success" type="button">儲存修改</button></div>
+    </section>
+  </div>
+
+
+  <div id="userManagerModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="userManagerTitle">
+    <div class="modal-backdrop" data-close-users="true"></div>
+    <section class="modal-card manager-card">
+      <div class="section-head"><div><h2 id="userManagerTitle">人員管理</h2><p class="section-note">只有管理員可以建立、停用及重設記錄員帳號。</p></div><button id="closeUserManagerModal" class="icon-button" type="button" aria-label="關閉">×</button></div>
+      <div class="user-create-grid">
+        <label>顯示名稱<input id="newUserName" type="text" maxlength="40" placeholder="例如：小王" /></label>
+        <label>Email<input id="newUserEmail" type="email" autocomplete="off" placeholder="recorder@example.com" /></label>
+        <label>初始密碼<input id="newUserPassword" type="password" autocomplete="new-password" minlength="8" placeholder="至少 8 碼" /></label>
+        <button id="createUserButton" class="success" type="button">建立記錄員</button>
+      </div>
+      <p id="userManagerMessage" class="message"></p>
+      <div class="section-head user-list-head"><h3>人員名單</h3><button id="refreshUsersButton" class="secondary compact" type="button">重新整理</button></div>
+      <div id="userManagerList" class="user-manager-list"><p class="empty">讀取中…</p></div>
     </section>
   </div>
 

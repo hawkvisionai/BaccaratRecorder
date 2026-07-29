@@ -3,6 +3,7 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const SUPABASE_URL = "https://rwxujvpakpemiwkitltk.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_aN_1_fzAV3hR6FmW7FTZGg_6SF0MUHF";
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+const USER_ADMIN_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/manage-users`;
 const $ = id => document.getElementById(id);
 
 const RANKS = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
@@ -20,6 +21,7 @@ let cardState = freshCardState();
 let winnerOnlyState = freshWinnerOnlyState();
 let currentUser = null;
 let currentProfile = null;
+let managedUsers = [];
 
 const loginPanel = $("loginPanel");
 const appPanel = $("appPanel");
@@ -306,6 +308,7 @@ function applyRoleUI(){
   $("userRoleBadge").textContent=isAdmin?"管理員":"記錄員";
   $("userRoleBadge").className=`role-badge ${isAdmin?"admin":"recorder"}`;
   $("manageShoesButton").classList.toggle("hidden",!isAdmin);
+  $("userManagerButton").classList.toggle("hidden",!isAdmin);
   if(!isAdmin && !document.getElementById("recorderNotice")){
     const note=document.createElement("div");note.id="recorderNotice";note.className="recorder-note";
     note.textContent="記錄員模式：可建立與記錄牌靴；牌靴管理功能僅限管理員。";
@@ -327,6 +330,53 @@ async function showAuthenticated(session){
 }
 function showLoggedOut(){loginPanel.classList.remove("hidden");appPanel.classList.add("hidden");userArea.classList.add("hidden");currentUser=null;currentProfile=null;currentShoe=null;currentGames=[]}
 
+
+async function callUserAdmin(action,payload={}){
+  const {data:{session}}=await supabase.auth.getSession();
+  if(!session) throw new Error("登入已失效，請重新登入");
+  const response=await fetch(USER_ADMIN_FUNCTION_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:JSON.stringify({action,...payload})});
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok) throw new Error(result.error||`人員管理服務錯誤（${response.status}）`);
+  return result;
+}
+function closeUserManager(){if(!busy)$("userManagerModal").classList.add("hidden")}
+async function openUserManager(){
+  if(currentProfile?.role!=="admin")return;
+  $("userManagerModal").classList.remove("hidden");
+  $("userManagerMessage").textContent="";
+  await loadManagedUsers();
+}
+async function loadManagedUsers(){
+  $("userManagerList").innerHTML='<p class="empty">讀取中…</p>';
+  try{const result=await callUserAdmin("list");managedUsers=result.users||[];renderManagedUsers()}
+  catch(e){$("userManagerList").innerHTML='<p class="empty">讀取失敗</p>';showMessage($("userManagerMessage"),e.message||"讀取人員失敗","error")}
+}
+function renderManagedUsers(){
+  $("userManagerList").innerHTML=managedUsers.length?managedUsers.map(u=>{
+    const admin=u.role==="admin",self=u.id===currentUser?.id,active=u.is_active!==false;
+    return `<div class="user-manager-row"><div><strong>${escapeHtml(u.display_name||u.email)}</strong><small>${escapeHtml(u.email)}</small></div><span class="role-badge ${admin?"admin":"recorder"}">${admin?"管理員":"記錄員"}</span><span class="account-state ${active?"active":"disabled"}">${active?"啟用":"停用"}</span><div class="user-actions">${admin?"":`<button class="secondary" data-user-action="password" data-id="${u.id}">重設密碼</button><button class="${active?"danger":"success"}" data-user-action="active" data-id="${u.id}">${active?"停用":"啟用"}</button>`}${self?'<span class="self-label">目前帳號</span>':""}</div></div>`
+  }).join(""):'<p class="empty">尚無人員資料</p>';
+  document.querySelectorAll("[data-user-action]").forEach(b=>b.onclick=()=>handleManagedUserAction(b.dataset.userAction,b.dataset.id));
+}
+async function createManagedUser(){
+  if(busy)return;
+  const display_name=$("newUserName").value.trim(),email=$("newUserEmail").value.trim(),password=$("newUserPassword").value;
+  if(!display_name||!email||password.length<8)return showMessage($("userManagerMessage"),"請填寫名稱、Email，密碼至少 8 碼","error");
+  setBusy(true);try{await callUserAdmin("create",{display_name,email,password});$("newUserName").value="";$("newUserEmail").value="";$("newUserPassword").value="";showSaveToast("✓ 記錄員已建立");await loadManagedUsers()}
+  catch(e){showMessage($("userManagerMessage"),e.message||"建立失敗","error")}finally{setBusy(false)}
+}
+async function handleManagedUserAction(action,id){
+  const user=managedUsers.find(u=>u.id===id);if(!user||user.role==="admin")return;
+  if(action==="password"){
+    const password=prompt(`請輸入 ${user.display_name||user.email} 的新密碼（至少 8 碼）`);if(password===null)return;if(password.length<8)return showMessage($("userManagerMessage"),"密碼至少 8 碼","error");
+    setBusy(true);try{await callUserAdmin("reset_password",{user_id:id,password});showSaveToast("✓ 密碼已重設")}catch(e){showMessage($("userManagerMessage"),e.message||"重設失敗","error")}finally{setBusy(false)}
+  }
+  if(action==="active"){
+    const active=user.is_active===false;if(!confirm(`確定要${active?"啟用":"停用"} ${user.display_name||user.email} 嗎？`))return;
+    setBusy(true);try{await callUserAdmin("set_active",{user_id:id,is_active:active});showSaveToast(active?"✓ 帳號已啟用":"✓ 帳號已停用");await loadManagedUsers()}catch(e){showMessage($("userManagerMessage"),e.message||"操作失敗","error")}finally{setBusy(false)}
+  }
+}
+
 $("modeComplete").onclick=()=>setMode("complete");
 $("modeWinnerOnly").onclick=()=>setMode("winner_only");
 $("nextRoundButton").onclick=saveAndNext;
@@ -337,8 +387,9 @@ $("winnerSuperSix").onclick=()=>{if(winnerOnlyState.winner==="莊"){winnerOnlySt
 $("newShoeButton").onclick=openShoeModal;$("confirmShoeButton").onclick=createNewShoe;$("addVenueButton").onclick=addVenue;$("closeShoeModal").onclick=closeShoeModal;$("cancelShoeButton").onclick=closeShoeModal;document.querySelector("[data-close-modal]").onclick=closeShoeModal;
 $("manageShoesButton").onclick=openShoeManager;$("closeManagerModal").onclick=closeManagerModal;document.querySelector("[data-close-manager]").onclick=closeManagerModal;$("shoeSearchInput").oninput=renderShoeManager;$("shoeStatusFilter").onchange=renderShoeManager;
 $("closeDetailModal").onclick=closeDetailModal;document.querySelector("[data-close-detail]").onclick=closeDetailModal;$("closeEditModal").onclick=closeEditModal;$("cancelEditShoeButton").onclick=closeEditModal;document.querySelector("[data-close-edit]").onclick=closeEditModal;$("saveEditShoeButton").onclick=saveEditedShoe;
+$("userManagerButton").onclick=openUserManager;$("closeUserManagerModal").onclick=closeUserManager;document.querySelector("[data-close-users]").onclick=closeUserManager;$("createUserButton").onclick=createManagedUser;$("refreshUsersButton").onclick=loadManagedUsers;
 $("undoButton").onclick=deleteLastGame;$("refreshButton").onclick=async()=>{try{await Promise.all([loadCloudData(),loadVenues()])}catch(e){showMessage(appMessage,e.message||"重新整理失敗","error")}};$("loginButton").onclick=login;$("logoutButton").onclick=logout;
-document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("editShoeModal").classList.contains("hidden"))return closeEditModal();if(!$("shoeDetailModal").classList.contains("hidden"))return closeDetailModal();if(!$("shoeManagerModal").classList.contains("hidden"))return closeManagerModal();if(!$("newShoeModal").classList.contains("hidden"))return closeShoeModal()}if(e.key==="Enter"&&!loginPanel.classList.contains("hidden"))login()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("userManagerModal").classList.contains("hidden"))return closeUserManager();if(!$("editShoeModal").classList.contains("hidden"))return closeEditModal();if(!$("shoeDetailModal").classList.contains("hidden"))return closeDetailModal();if(!$("shoeManagerModal").classList.contains("hidden"))return closeManagerModal();if(!$("newShoeModal").classList.contains("hidden"))return closeShoeModal()}if(e.key==="Enter"&&!loginPanel.classList.contains("hidden"))login()});
 
 renderCardInput();updateWinnerOnlyUI();updateRecordState();
 supabase.auth.onAuthStateChange(async(_event,session)=>session?await showAuthenticated(session):showLoggedOut());
