@@ -66,3 +66,12 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .archived-row{opacity:.72}.active-shoe-marker{display:inline-block;margin-left:7px;padding:2px 7px;border-radius:999px;background:#166534;color:#dcfce7;font-size:11px}
 .detail-game-row{background:var(--card2);padding:12px;border-radius:12px;border:1px solid var(--line)}
 @media(max-width:760px){.manager-filters{grid-template-columns:1fr}.shoe-manager-row{grid-template-columns:1fr 1fr}.shoe-actions{grid-column:1/-1;justify-content:stretch}.shoe-actions button{flex:1}.shoe-manager-meta{text-align:right}}
+
+/* v15.0 智慧記錄 */
+.record-head-row{display:grid;grid-template-columns:minmax(160px,220px) 1fr;gap:14px;align-items:end;margin-bottom:16px}
+.record-head-row .game-number-label{margin:0}.record-state{min-height:54px;display:flex;align-items:center;justify-content:center;border-radius:14px;font-weight:900;border:1px solid var(--line)}
+.record-state.incomplete{background:#273449;color:#e2e8f0}.record-state.valid{background:rgba(22,163,74,.18);border-color:#22c55e;color:#86efac}
+.card-steps{display:grid;gap:12px}.card-step{border:1px solid var(--line);background:#0c1728;border-radius:16px;padding:14px}.card-step.locked{opacity:.5}.card-step.complete{border-color:#166534}.card-step-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.card-step-title{font-size:18px;font-weight:900}.card-value{min-width:58px;padding:8px 12px;text-align:center;border-radius:10px;background:#334155;font-weight:900}.card-value.selected{background:#15803d;color:#fff}
+.rank-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin-top:12px}.rank-button{min-height:48px;padding:8px 4px;background:#24344c;border:1px solid #3b4d68;font-size:17px}.rank-button.selected{background:#15803d;border-color:#4ade80}.rank-button:active{transform:none}
+.complete-summary{margin:14px 0;padding:14px;border:1px solid #166534;background:rgba(22,163,74,.1);border-radius:14px;line-height:1.7;font-weight:800}.winner-options{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 16px}.winner-button.selected{outline:4px solid #f8fafc;outline-offset:2px}.check-toggle{color:var(--text)}
+@media(max-width:620px){.record-head-row{grid-template-columns:1fr}.rank-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.winner-options{grid-template-columns:1fr}.card-step{padding:12px}}

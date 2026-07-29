@@ -4,13 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="dark light" />
-  <title>Baccarat Platform Studio v14.5</title>
+  <title>Baccarat Platform Studio v15.0</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="container">
     <header class="topbar">
-      <div><h1>Baccarat Platform Studio</h1><p>v14.5｜牌桌位置版</p></div>
+      <div><h1>Baccarat Platform Studio</h1><p>v15.0｜智慧記錄</p></div>
       <button id="logoutButton" class="secondary hidden" type="button">登出</button>
     </header>
 
@@ -32,7 +32,7 @@
 
       <section class="card">
         <div class="section-head">
-          <div><h2>牌局輸入</h2><p class="section-note">可直接修改局數，跳過未記錄的牌局。</p></div>
+          <div><h2>牌局輸入</h2><p class="section-note">輸入完成後，按「下一局」會自動儲存。</p></div>
           <span id="shoeState" class="badge">未開始</span>
         </div>
 
@@ -41,38 +41,32 @@
           <button id="modeWinnerOnly" class="mode-button" type="button">只記勝方</button>
         </div>
 
-        <label class="game-number-label">本次記錄局數
-          <input id="gameNumberInput" type="number" min="1" inputmode="numeric" value="1" />
-        </label>
+        <div class="record-head-row">
+          <label class="game-number-label">本次記錄局數
+            <input id="gameNumberInput" type="number" min="1" inputmode="numeric" value="1" />
+          </label>
+          <div id="recordState" class="record-state incomplete" role="status">尚未輸入完整</div>
+        </div>
 
         <div id="completePanel">
-          <div class="point-grid">
-            <label>閒點數<input id="playerInput" type="number" min="0" max="9" inputmode="numeric" placeholder="0～9" /></label>
-            <label>莊點數<input id="bankerInput" type="number" min="0" max="9" inputmode="numeric" placeholder="0～9" /></label>
-          </div>
-
-          <div class="toggle-grid">
-            <button id="playerPair" class="check-toggle" type="button" aria-pressed="false">☐ 閒對</button>
-            <button id="bankerPair" class="check-toggle" type="button" aria-pressed="false">☐ 莊對</button>
-            <button id="playerNatural" class="check-toggle" type="button" aria-pressed="false">☐ 閒自然牌</button>
-            <button id="bankerNatural" class="check-toggle" type="button" aria-pressed="false">☐ 莊自然牌</button>
-            <button id="superSix" class="check-toggle" type="button" aria-pressed="false">☐ Super 6</button>
-          </div>
-
-          <div class="card-count-grid">
-            <div><span>閒家牌數</span><button id="playerCardCount" class="count-toggle" type="button" data-value="2">2 張</button></div>
-            <div><span>莊家牌數</span><button id="bankerCardCount" class="count-toggle" type="button" data-value="2">2 張</button></div>
-          </div>
-
-          <button id="addGameButton" class="primary large" type="button">新增牌局</button>
+          <div id="cardSteps" class="card-steps"></div>
+          <div id="completeSummary" class="complete-summary hidden"></div>
         </div>
 
-        <div id="winnerOnlyPanel" class="winner-only-panel hidden">
-          <button class="winner-button player" type="button" data-winner="閒">閒</button>
-          <button class="winner-button banker" type="button" data-winner="莊">莊</button>
-          <button class="winner-button tie" type="button" data-winner="和">和</button>
+        <div id="winnerOnlyPanel" class="hidden">
+          <div class="winner-only-panel">
+            <button class="winner-button player" type="button" data-winner="閒">閒</button>
+            <button class="winner-button banker" type="button" data-winner="莊">莊</button>
+            <button class="winner-button tie" type="button" data-winner="和">和</button>
+          </div>
+          <div class="winner-options">
+            <button id="winnerPlayerPair" class="check-toggle" type="button" aria-pressed="false">☐ 閒對</button>
+            <button id="winnerBankerPair" class="check-toggle" type="button" aria-pressed="false">☐ 莊對</button>
+            <button id="winnerSuperSix" class="check-toggle hidden" type="button" aria-pressed="false">☐ Lucky 6（幸運六）</button>
+          </div>
         </div>
 
+        <button id="nextRoundButton" class="primary large" type="button" disabled>下一局</button>
         <p id="appMessage" class="message"></p>
         <div class="action-grid">
           <button id="undoButton" class="secondary" type="button">刪除上一局</button>
@@ -91,62 +85,29 @@
   <div id="newShoeModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="newShoeTitle">
     <div class="modal-backdrop" data-close-modal="true"></div>
     <section class="modal-card">
-      <div class="section-head">
-        <div><h2 id="newShoeTitle">新增牌靴</h2><p class="section-note">場館只需每個牌靴選擇一次。</p></div>
-        <button id="closeShoeModal" class="icon-button" type="button" aria-label="關閉">×</button>
-      </div>
-      <label>場館
-        <div class="venue-input-row">
-          <select id="venueSelect"></select>
-          <button id="addVenueButton" class="secondary" type="button">＋ 新增</button>
-        </div>
-      </label>
-      <label>牌靴名稱（選填）
-        <input id="shoeNameInput" type="text" maxlength="60" placeholder="例如：晚場 A 桌" />
-      </label>
-      <label>開始記錄局數
-        <input id="startGameInput" type="number" min="1" inputmode="numeric" value="1" />
-      </label>
-      <label class="default-venue-row">
-        <input id="defaultVenueCheckbox" type="checkbox" />
-        <span>設為預設場館</span>
-      </label>
+      <div class="section-head"><div><h2 id="newShoeTitle">新增牌靴</h2><p class="section-note">場館只需每個牌靴選擇一次。</p></div><button id="closeShoeModal" class="icon-button" type="button" aria-label="關閉">×</button></div>
+      <label>場館<div class="venue-input-row"><select id="venueSelect"></select><button id="addVenueButton" class="secondary" type="button">＋ 新增</button></div></label>
+      <label>牌靴名稱（選填）<input id="shoeNameInput" type="text" maxlength="60" placeholder="例如：晚場 A 桌" /></label>
+      <label>開始記錄局數<input id="startGameInput" type="number" min="1" inputmode="numeric" value="1" /></label>
+      <label class="default-venue-row"><input id="defaultVenueCheckbox" type="checkbox" /><span>設為預設場館</span></label>
       <p id="shoeModalMessage" class="message"></p>
-      <div class="modal-actions">
-        <button id="cancelShoeButton" class="secondary" type="button">取消</button>
-        <button id="confirmShoeButton" class="success" type="button">建立牌靴</button>
-      </div>
+      <div class="modal-actions"><button id="cancelShoeButton" class="secondary" type="button">取消</button><button id="confirmShoeButton" class="success" type="button">建立牌靴</button></div>
     </section>
   </div>
-
 
   <div id="shoeManagerModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="shoeManagerTitle">
     <div class="modal-backdrop" data-close-manager="true"></div>
     <section class="modal-card manager-card">
-      <div class="section-head">
-        <div><h2 id="shoeManagerTitle">牌靴管理</h2><p class="section-note">查看、修改、封存或刪除牌靴。</p></div>
-        <button id="closeManagerModal" class="icon-button" type="button" aria-label="關閉">×</button>
-      </div>
-      <div class="manager-filters">
-        <input id="shoeSearchInput" type="search" placeholder="搜尋牌靴編號、名稱或場館" />
-        <select id="shoeStatusFilter">
-          <option value="active">正常牌靴</option>
-          <option value="archived">已封存</option>
-          <option value="all">全部</option>
-        </select>
-      </div>
-      <p id="managerMessage" class="message"></p>
-      <div id="shoeManagerList" class="shoe-manager-list"><p class="empty">讀取中…</p></div>
+      <div class="section-head"><div><h2 id="shoeManagerTitle">牌靴管理</h2><p class="section-note">查看、修改、封存或刪除牌靴。</p></div><button id="closeManagerModal" class="icon-button" type="button" aria-label="關閉">×</button></div>
+      <div class="manager-filters"><input id="shoeSearchInput" type="search" placeholder="搜尋牌靴編號、名稱或場館" /><select id="shoeStatusFilter"><option value="active">正常牌靴</option><option value="archived">已封存</option><option value="all">全部</option></select></div>
+      <p id="managerMessage" class="message"></p><div id="shoeManagerList" class="shoe-manager-list"><p class="empty">讀取中…</p></div>
     </section>
   </div>
 
   <div id="shoeDetailModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="shoeDetailTitle">
     <div class="modal-backdrop" data-close-detail="true"></div>
     <section class="modal-card manager-card">
-      <div class="section-head">
-        <div><h2 id="shoeDetailTitle">牌靴內容</h2><p id="shoeDetailMeta" class="section-note"></p></div>
-        <button id="closeDetailModal" class="icon-button" type="button" aria-label="關閉">×</button>
-      </div>
+      <div class="section-head"><div><h2 id="shoeDetailTitle">牌靴內容</h2><p id="shoeDetailMeta" class="section-note"></p></div><button id="closeDetailModal" class="icon-button" type="button" aria-label="關閉">×</button></div>
       <div id="shoeDetailGames" class="recent-list"><p class="empty">讀取中…</p></div>
     </section>
   </div>
@@ -154,17 +115,9 @@
   <div id="editShoeModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="editShoeTitle">
     <div class="modal-backdrop" data-close-edit="true"></div>
     <section class="modal-card">
-      <div class="section-head">
-        <div><h2 id="editShoeTitle">修改牌靴</h2><p class="section-note">可修改場館與牌靴名稱。</p></div>
-        <button id="closeEditModal" class="icon-button" type="button" aria-label="關閉">×</button>
-      </div>
-      <label>場館<select id="editVenueSelect"></select></label>
-      <label>牌靴名稱（選填）<input id="editShoeNameInput" type="text" maxlength="60" /></label>
-      <p id="editShoeMessage" class="message"></p>
-      <div class="modal-actions">
-        <button id="cancelEditShoeButton" class="secondary" type="button">取消</button>
-        <button id="saveEditShoeButton" class="success" type="button">儲存修改</button>
-      </div>
+      <div class="section-head"><div><h2 id="editShoeTitle">修改牌靴</h2><p class="section-note">可修改場館與牌靴名稱。</p></div><button id="closeEditModal" class="icon-button" type="button" aria-label="關閉">×</button></div>
+      <label>場館<select id="editVenueSelect"></select></label><label>牌靴名稱（選填）<input id="editShoeNameInput" type="text" maxlength="60" /></label>
+      <p id="editShoeMessage" class="message"></p><div class="modal-actions"><button id="cancelEditShoeButton" class="secondary" type="button">取消</button><button id="saveEditShoeButton" class="success" type="button">儲存修改</button></div>
     </section>
   </div>
 
