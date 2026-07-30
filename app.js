@@ -40,7 +40,7 @@ const appMessage = $("appMessage");
 const userArea = $("userArea");
 
 function freshCardState(){
-  return { player:[null,null,null], banker:[null,null,null], active:"player0" };
+  return { player:[null,null,null], banker:[null,null,null], active:"playerInitial" };
 }
 function freshWinnerOnlyState(){
   return { winner:null, playerPair:false, bankerPair:false, superSix:false };
@@ -115,51 +115,74 @@ function completeDerived(){
     player_card_count:pCards.length, banker_card_count:bCards.length
   };
 }
-function stepTitle(key){
-  return ({player0:"閒第一張",player1:"閒第二張",player2:"閒第三張",banker0:"莊第一張",banker1:"莊第二張",banker2:"莊第三張"})[key];
+function activeInputFromProgress(){
+  const p=completeProgress();
+  if(p.complete) return "complete";
+  if(p.next==="player0"||p.next==="player1") return "playerInitial";
+  if(p.next==="banker0"||p.next==="banker1") return "bankerInitial";
+  return p.next;
 }
-function parseStep(key){ return {side:key.startsWith("player")?"player":"banker",index:Number(key.at(-1))}; }
-function visibleSteps(){
-  const progress=completeProgress();
-  const base=["player0"];
-  if(cardState.player[0]) base.push("player1");
-  if(cardState.player[1]) base.push("banker0");
-  if(cardState.banker[0]) base.push("banker1");
-  if(cardState.banker[1]){
-    const pTwo=handPoints(cardState.player.slice(0,2)), bTwo=handPoints(cardState.banker.slice(0,2));
-    if(!isNatural(pTwo,bTwo) && playerNeedsThird(pTwo,bTwo)) base.push("player2");
-    if(cardState.player[2] || !playerNeedsThird(pTwo,bTwo)){
-      const pDrew=playerNeedsThird(pTwo,bTwo);
-      if(!isNatural(pTwo,bTwo) && bankerNeedsThird(bTwo,pDrew,cardState.player[2])) base.push("banker2");
-    }
-  }
-  if(progress.next) cardState.active=progress.next;
-  return [...new Set(base)];
-}
-function selectCard(key,rank){
-  const {side,index}=parseStep(key);
-  cardState[side][index]=rank;
-  // 修改前面的牌時，清除所有受影響的後續補牌，避免殘留不合理資料。
-  if(key==="player0"||key==="player1"||key==="banker0"||key==="banker1"){
+function selectActiveRank(rank){
+  const active=cardState.active;
+  if(active==="playerInitial"){
+    const index=cardState.player[0]?1:0;
+    cardState.player[index]=rank;
     cardState.player[2]=null; cardState.banker[2]=null;
-  } else if(key==="player2") cardState.banker[2]=null;
-  cardState.active=completeProgress().next || key;
+  }else if(active==="bankerInitial"){
+    const index=cardState.banker[0]?1:0;
+    cardState.banker[index]=rank;
+    cardState.player[2]=null; cardState.banker[2]=null;
+  }else if(active==="player2"){
+    cardState.player[2]=rank; cardState.banker[2]=null;
+  }else if(active==="banker2"){
+    cardState.banker[2]=rank;
+  }
+  cardState.active=activeInputFromProgress();
   renderCardInput(); updateRecordState();
 }
+function editCard(side,index){
+  cardState[side][index]=null;
+  if(index<2){ cardState.player[2]=null; cardState.banker[2]=null; }
+  if(side==="player"&&index===2) cardState.banker[2]=null;
+  cardState.active=index<2?`${side}Initial`:`${side}2`;
+  renderCardInput(); updateRecordState();
+}
+function handDisplay(side,label){
+  const cards=cardState[side];
+  const initialReady=!!cards[0]&&!!cards[1];
+  const point=initialReady?handPoints(cards.slice(0,2)):null;
+  const cardButton=(rank,index)=>`<button type="button" class="table-card ${rank?"filled":"empty"}" data-edit-side="${side}" data-edit-index="${index}" ${rank?"":"disabled"}>${rank||"·"}</button>`;
+  return `<div class="table-hand ${side}">
+    <div class="table-hand-head"><strong>${label}</strong>${initialReady?`<span class="initial-points">＋${point}</span>`:""}</div>
+    <div class="initial-cards">${cardButton(cards[0],0)}${cardButton(cards[1],1)}</div>
+    <div class="third-card-row">${cards[2]?cardButton(cards[2],2):'<span class="third-card-placeholder"></span>'}</div>
+  </div>`;
+}
+function activeInputLabel(active){
+  return ({playerInitial:"閒",bankerInitial:"莊",player2:"閒補牌",banker2:"莊補牌"})[active]||"本局完成";
+}
 function renderCardInput(){
-  const steps=visibleSteps();
-  $("cardSteps").innerHTML=steps.map(key=>{
-    const {side,index}=parseStep(key), selected=cardState[side][index], active=cardState.active===key && !completeProgress().complete;
-    const buttons=active?`<div class="rank-grid">${RANKS.map(rank=>`<button type="button" class="rank-button ${selected===rank?"selected":""}" data-card-step="${key}" data-rank="${rank}">${rank}</button>`).join("")}</div>`:"";
-    return `<section class="card-step ${selected?"complete":""}"><div class="card-step-head"><span class="card-step-title">${stepTitle(key)}</span><button type="button" class="card-value ${selected?"selected":""}" data-open-step="${key}">${selected||"待輸入"}</button></div>${buttons}</section>`;
-  }).join("");
-  document.querySelectorAll("[data-card-step]").forEach(b=>b.onclick=()=>selectCard(b.dataset.cardStep,b.dataset.rank));
-  document.querySelectorAll("[data-open-step]").forEach(b=>b.onclick=()=>{cardState.active=b.dataset.openStep;renderCardInput()});
+  const progress=completeProgress();
+  if(cardState.active==="complete"&&!progress.complete) cardState.active=activeInputFromProgress();
+  const active=cardState.active;
+  const showRankGrid=!progress.complete;
+  $("cardSteps").innerHTML=`
+    <div class="baccarat-table-layout">
+      ${handDisplay("player","閒")}
+      <div class="table-divider"></div>
+      ${handDisplay("banker","莊")}
+    </div>
+    ${showRankGrid?`<section class="combined-card-input"><div class="combined-input-title">${activeInputLabel(active)}</div><div class="rank-grid">${RANKS.map(rank=>`<button type="button" class="rank-button" data-active-rank="${rank}">${rank}</button>`).join("")}</div></section>`:""}`;
+  document.querySelectorAll("[data-active-rank]").forEach(b=>b.onclick=()=>selectActiveRank(b.dataset.activeRank));
+  document.querySelectorAll("[data-edit-side]").forEach(b=>b.onclick=()=>editCard(b.dataset.editSide,Number(b.dataset.editIndex)));
   const d=completeDerived();
   $("completeSummary").classList.toggle("hidden",!d);
+  $("completeSummary").classList.remove("result-player","result-banker","result-tie");
   if(d){
+    const resultClass=d.winner==="閒"?"result-player":d.winner==="莊"?"result-banker":"result-tie";
+    $("completeSummary").classList.add(resultClass);
     const tags=[]; if(d.player_pair)tags.push("閒對");if(d.banker_pair)tags.push("莊對");if(d.player_natural||d.banker_natural)tags.push("Natural（天牌）");if(d.super_six)tags.push("Lucky 6（幸運六）");
-    $("completeSummary").innerHTML=`閒 ${d.player_points} 點｜莊 ${d.banker_points} 點｜勝方：${d.winner}<br>${tags.length?tags.join("｜"):"無額外項目"}`;
+    $("completeSummary").innerHTML=`<div class="result-title">${d.winner==="和"?"和局":`${d.winner}贏`}</div><div>閒 ${d.player_points} 點｜莊 ${d.banker_points} 點</div><div class="result-tags">${tags.length?tags.join("｜"):"無額外項目"}</div>`;
   }
 }
 function setToggle(id,on){
