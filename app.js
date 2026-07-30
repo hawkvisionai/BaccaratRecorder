@@ -31,6 +31,9 @@ let realtimeJoinedCount = 0;
 let onlineProfiles = new Map();
 let dashboardData = null;
 let dashboardRefreshTimer = null;
+let finishedHistoryData = [];
+let personnelStatsData = [];
+let selectedPersonnel = null;
 
 const loginPanel = $("loginPanel");
 const appPanel = $("appPanel");
@@ -367,23 +370,26 @@ async function loadDashboard(silent=false){
   try{
     const today=startOfTodayIso();
     const [activeR,todayFinishedR,todayGamesR,totalShoesR,totalGamesR,recentShoesR,finishedR]=await Promise.all([
-      supabase.from("shoes").select("id,shoe_number,name,venue,status,created_at,recording_started_at,finished_at,is_archived").eq("status","open").eq("is_archived",false).order("created_at",{ascending:false}),
+      supabase.from("shoes").select("id,shoe_number,name,venue,status,owner_id,created_at,recording_started_at,finished_at,is_archived").eq("status","open").eq("is_archived",false).order("created_at",{ascending:false}),
       supabase.from("shoes").select("id",{count:"exact",head:true}).gte("finished_at",today).eq("is_archived",false),
       supabase.from("games").select("id",{count:"exact",head:true}).gte("created_at",today),
       supabase.from("shoes").select("id",{count:"exact",head:true}).eq("is_archived",false),
       supabase.from("games").select("id",{count:"exact",head:true}),
-      supabase.from("shoes").select("id,shoe_number,name,venue,status,created_at,recording_started_at,finished_at,is_archived").order("created_at",{ascending:false}).limit(30),
-      supabase.from("shoes").select("id,shoe_number,name,venue,status,created_at,recording_started_at,finished_at,is_archived").not("finished_at","is",null).eq("is_archived",false).order("finished_at",{ascending:false}).limit(10)
+      supabase.from("shoes").select("id,shoe_number,name,venue,status,owner_id,created_at,recording_started_at,finished_at,is_archived").order("created_at",{ascending:false}).limit(30),
+      supabase.from("shoes").select("id,shoe_number,name,venue,status,owner_id,created_at,recording_started_at,finished_at,is_archived").not("finished_at","is",null).eq("is_archived",false).order("finished_at",{ascending:false}).limit(5)
     ]);
     const responses=[activeR,todayFinishedR,todayGamesR,totalShoesR,totalGamesR,recentShoesR,finishedR];
     const err=responses.find(r=>r.error)?.error;if(err)throw err;
     const active=activeR.data||[],finished=finishedR.data||[];
+    const ownerIds=[...new Set([...active,...finished].map(s=>s.owner_id).filter(Boolean))];
+    let ownerMap=new Map();
+    if(ownerIds.length){const pr=await supabase.from("profiles").select("id,display_name,username").in("id",ownerIds);if(pr.error)throw pr.error;ownerMap=new Map((pr.data||[]).map(p=>[String(p.id),p.display_name||p.username||"未命名人員"]));}
     const shoeIds=[...new Set([...active,...finished].map(s=>s.id))];
     let games=[];
     if(shoeIds.length){const gr=await supabase.from("games").select("shoe_id,game_number,created_at").in("shoe_id",shoeIds);if(gr.error)throw gr.error;games=gr.data||[]}
     const gameMap=new Map();
     games.forEach(g=>{const key=String(g.shoe_id),x=gameMap.get(key)||{count:0,last_at:null};x.count+=1;if(!x.last_at||new Date(g.created_at)>new Date(x.last_at))x.last_at=g.created_at;gameMap.set(key,x)});
-    const attach=s=>({...s,...(gameMap.get(String(s.id))||{count:0,last_at:null})});
+    const attach=s=>({...s,owner_name:ownerMap.get(String(s.owner_id))||"未指定",...(gameMap.get(String(s.id))||{count:0,last_at:null})});
     dashboardData={active:active.map(attach),finished:finished.map(attach),todayFinished:todayFinishedR.count||0,todayGames:todayGamesR.count||0,totalShoes:totalShoesR.count||0,totalGames:totalGamesR.count||0,recentShoes:recentShoesR.data||[]};
     renderDashboard();
   }catch(e){console.error(e);showMessage($("dashboardMessage"),e.message||"讀取管理總覽失敗","error")}
@@ -396,7 +402,7 @@ function formatDuration(start,end){
   return m?`${h} 小時 ${m} 分`:`${h} 小時`;
 }
 function dashboardShoeRow(s,finished=false){
-  return `<button class="dashboard-row shoe dashboard-open-shoe" data-shoe-id="${s.id}" type="button"><div class="dashboard-row-main"><strong>${escapeHtml(s.shoe_number||"未命名")}</strong><small>${escapeHtml(s.venue||"未選場館")}${s.name&&s.name!==s.shoe_number?`｜${escapeHtml(s.name)}`:""}</small></div><div class="dashboard-shoe-count"><strong>${s.count||0}</strong><small>局</small></div><span class="dashboard-time">${finished?`${formatDate(s.finished_at)}｜記錄時長：${s.recording_started_at?formatDuration(s.recording_started_at,s.finished_at):"尚未開始記錄"}`:(s.last_at?`最後記錄 ${formatDate(s.last_at)}`:`開始 ${formatDate(s.created_at)}`)}</span></button>`;
+  return `<button class="dashboard-row shoe dashboard-open-shoe" data-shoe-id="${s.id}" type="button"><div class="dashboard-row-main"><strong>${escapeHtml(s.shoe_number||"未命名")}</strong><small>${escapeHtml(s.venue||"未選場館")}${s.name&&s.name!==s.shoe_number?`｜${escapeHtml(s.name)}`:""}｜記錄者：${escapeHtml(s.owner_name||"未指定")}</small></div><div class="dashboard-shoe-count"><strong>${s.count||0}</strong><small>局</small></div><span class="dashboard-time">${finished?`${formatDate(s.finished_at)}｜記錄時長：${s.recording_started_at?formatDuration(s.recording_started_at,s.finished_at):"尚未開始記錄"}`:(s.last_at?`最後記錄 ${formatDate(s.last_at)}`:`開始 ${formatDate(s.created_at)}`)}</span></button>`;
 }
 function bindDashboardShoeRows(){
   document.querySelectorAll(".dashboard-open-shoe").forEach(b=>b.onclick=async()=>{
@@ -417,13 +423,68 @@ function renderDashboard(){
   $("dashboardActivity").innerHTML=activities.length?activities.slice(0,12).map(x=>`<div class="activity-row"><span class="activity-icon ${x.kind}">${x.kind==="finish"?"✓":"＋"}</span><div><strong>${escapeHtml(x.text)}</strong><small>${formatDate(x.at)}</small></div></div>`).join(""):'<p class="empty">尚無活動資料</p>';
   bindDashboardShoeRows();
 }
+
+function closeFinishedHistory(){if(!busy)$("finishedHistoryModal").classList.add("hidden")}
+function closePersonnelStats(){if(!busy)$("personnelStatsModal").classList.add("hidden")}
+function closePersonnelDetail(){if(!busy)$("personnelDetailModal").classList.add("hidden")}
+function adminRecordCard(s){
+  const displayName=s.name&&s.name!==s.shoe_number?s.name:"未填名稱";
+  return `<button class="admin-record-card" data-admin-shoe-id="${s.id}" type="button"><div class="admin-record-title"><strong>${escapeHtml(s.shoe_number||"未命名牌靴")}</strong><span>${s.count||0} 局</span></div><div class="admin-record-grid"><div><small>牌靴名稱</small><b>${escapeHtml(displayName)}</b></div><div><small>場館名稱</small><b>${escapeHtml(s.venue||"未選場館")}</b></div><div><small>記錄者</small><b>${escapeHtml(s.owner_name||"未指定")}</b></div><div><small>開始記錄</small><b>${s.recording_started_at?formatDate(s.recording_started_at):"尚未開始"}</b></div><div><small>完成時間</small><b>${formatDate(s.finished_at)}</b></div><div><small>記錄時長</small><b>${s.recording_started_at?formatDuration(s.recording_started_at,s.finished_at):"—"}</b></div></div></button>`;
+}
+async function attachAdminShoeDetails(shoes){
+  const ownerIds=[...new Set(shoes.map(s=>s.owner_id).filter(Boolean))];
+  const shoeIds=shoes.map(s=>s.id);
+  let ownerMap=new Map(),gameMap=new Map();
+  if(ownerIds.length){const r=await supabase.from("profiles").select("id,display_name,username").in("id",ownerIds);if(r.error)throw r.error;ownerMap=new Map((r.data||[]).map(p=>[String(p.id),p.display_name||p.username||"未命名人員"]));}
+  if(shoeIds.length){const r=await supabase.from("games").select("shoe_id,id").in("shoe_id",shoeIds);if(r.error)throw r.error;(r.data||[]).forEach(g=>gameMap.set(String(g.shoe_id),(gameMap.get(String(g.shoe_id))||0)+1));}
+  return shoes.map(s=>({...s,owner_name:ownerMap.get(String(s.owner_id))||"未指定",count:gameMap.get(String(s.id))||0}));
+}
+async function openFinishedHistory(){
+  if(currentProfile?.role!=="admin")return;
+  $("finishedHistoryModal").classList.remove("hidden");$("finishedHistoryMessage").textContent="";$("finishedHistoryList").innerHTML='<p class="empty">讀取中…</p>';
+  try{const r=await supabase.from("shoes").select("id,shoe_number,name,venue,status,owner_id,created_at,recording_started_at,finished_at,is_archived").not("finished_at","is",null).eq("is_archived",false).order("finished_at",{ascending:false}).limit(50);if(r.error)throw r.error;finishedHistoryData=await attachAdminShoeDetails(r.data||[]);renderFinishedHistory();}
+  catch(e){showMessage($("finishedHistoryMessage"),e.message||"讀取最近完成牌靴失敗","error");$("finishedHistoryList").innerHTML='<p class="empty">讀取失敗</p>';}
+}
+function renderFinishedHistory(){
+  const q=$("finishedHistorySearch").value.trim().toLowerCase();
+  const rows=finishedHistoryData.filter(s=>!q||[s.shoe_number,s.name,s.venue,s.owner_name].filter(Boolean).join(" ").toLowerCase().includes(q));
+  $("finishedHistoryCount").textContent=`${rows.length} 副`;
+  $("finishedHistoryList").innerHTML=rows.length?rows.map(adminRecordCard).join(""):'<p class="empty">沒有符合條件的牌靴</p>';
+  document.querySelectorAll("#finishedHistoryList [data-admin-shoe-id]").forEach(b=>b.onclick=async()=>{const s=finishedHistoryData.find(x=>String(x.id)===String(b.dataset.adminShoeId));if(s)await viewShoe(s)});
+}
+async function openPersonnelStats(){
+  if(currentProfile?.role!=="admin")return;
+  $("personnelStatsModal").classList.remove("hidden");$("personnelStatsMessage").textContent="";$("personnelStatsList").innerHTML='<p class="empty">讀取中…</p>';
+  try{
+    const [pr,sr]=await Promise.all([supabase.from("profiles").select("id,display_name,username,email,role,is_active").order("display_name",{ascending:true}),supabase.from("shoes").select("id,owner_id,finished_at").not("finished_at","is",null).eq("is_archived",false)]);if(pr.error)throw pr.error;if(sr.error)throw sr.error;
+    const now=Date.now(),d7=now-7*86400000,d30=now-30*86400000,shoes=sr.data||[];
+    personnelStatsData=(pr.data||[]).map(p=>{const own=shoes.filter(s=>String(s.owner_id)===String(p.id));return {...p,total:own.length,last7:own.filter(s=>new Date(s.finished_at).getTime()>=d7).length,last30:own.filter(s=>new Date(s.finished_at).getTime()>=d30).length,lastFinished:own.sort((a,b)=>new Date(b.finished_at)-new Date(a.finished_at))[0]?.finished_at||null};}).sort((a,b)=>b.last30-a.last30||b.total-a.total||(a.display_name||a.username||"").localeCompare(b.display_name||b.username||"","zh-Hant"));
+    renderPersonnelStats();
+  }catch(e){showMessage($("personnelStatsMessage"),e.message||"讀取人員統計失敗","error");$("personnelStatsList").innerHTML='<p class="empty">讀取失敗</p>';}
+}
+function renderPersonnelStats(){
+  const q=$("personnelSearch").value.trim().toLowerCase();
+  const rows=personnelStatsData.filter(p=>!q||[p.display_name,p.username,p.email].filter(Boolean).join(" ").toLowerCase().includes(q));
+  $("personnelCount").textContent=`${rows.length} 人`;
+  $("personnelStatsList").innerHTML=rows.length?rows.map(p=>`<button class="personnel-card" data-person-id="${p.id}" type="button"><div class="personnel-card-head"><div><strong>${escapeHtml(p.display_name||p.username||"未命名人員")}</strong><small>${escapeHtml(p.username||p.email||"")}｜${p.role==="admin"?"管理員":"記錄員"}</small></div><span>${p.is_active===false?"已停用":"啟用中"}</span></div><div class="personnel-count-grid"><div><b>${p.last7}</b><small>最近 7 天</small></div><div><b>${p.last30}</b><small>最近 30 天</small></div><div><b>${p.total}</b><small>累計完成</small></div></div><div class="personnel-last">最近完成：${p.lastFinished?formatDate(p.lastFinished):"尚無完成牌靴"}</div></button>`).join(""):'<p class="empty">沒有符合條件的人員</p>';
+  document.querySelectorAll("#personnelStatsList [data-person-id]").forEach(b=>b.onclick=()=>openPersonnelDetail(b.dataset.personId));
+}
+async function openPersonnelDetail(personId){
+  if(currentProfile?.role!=="admin")return;
+  selectedPersonnel=personnelStatsData.find(p=>String(p.id)===String(personId));if(!selectedPersonnel)return;
+  $("personnelDetailModal").classList.remove("hidden");$("personnelDetailTitle").textContent=selectedPersonnel.display_name||selectedPersonnel.username||"人員牌靴細項";$("personnelDetailMeta").textContent=`${selectedPersonnel.username||selectedPersonnel.email||""}｜最近完成牌靴`;$("personnelDetailList").innerHTML='<p class="empty">讀取中…</p>';
+  $("personnelDetailSummary").innerHTML=`<div><b>${selectedPersonnel.last7}</b><small>最近 7 天</small></div><div><b>${selectedPersonnel.last30}</b><small>最近 30 天</small></div><div><b>${selectedPersonnel.total}</b><small>累計完成</small></div>`;
+  try{const r=await supabase.from("shoes").select("id,shoe_number,name,venue,status,owner_id,created_at,recording_started_at,finished_at,is_archived").eq("owner_id",personId).not("finished_at","is",null).eq("is_archived",false).order("finished_at",{ascending:false}).limit(50);if(r.error)throw r.error;const rows=(await attachAdminShoeDetails(r.data||[])).map(s=>({...s,owner_name:selectedPersonnel.display_name||selectedPersonnel.username||"未命名人員"}));$("personnelDetailList").innerHTML=rows.length?rows.map(adminRecordCard).join(""):'<p class="empty">此人員尚無已完成牌靴</p>';document.querySelectorAll("#personnelDetailList [data-admin-shoe-id]").forEach(b=>b.onclick=async()=>{const s=rows.find(x=>String(x.id)===String(b.dataset.adminShoeId));if(s)await viewShoe(s)});}
+  catch(e){$("personnelDetailList").innerHTML=`<p class="empty">${escapeHtml(e.message||"讀取失敗")}</p>`;}
+}
+
 async function searchDashboardShoes(){
   const input=$("dashboardShoeSearchInput"),box=$("dashboardSearchResults"),q=input.value.trim();
   if(!q){box.classList.add("hidden");box.innerHTML="";return}
   box.classList.remove("hidden");box.innerHTML='<p class="empty">搜尋中…</p>';
   const safe=q.replace(/[%_,]/g," ").trim();
   try{
-    const {data,error}=await supabase.from("shoes").select("id,shoe_number,name,venue,status,created_at,recording_started_at,finished_at,is_archived").or(`shoe_number.ilike.%${safe}%,name.ilike.%${safe}%,venue.ilike.%${safe}%`).order("created_at",{ascending:false}).limit(20);
+    const {data,error}=await supabase.from("shoes").select("id,shoe_number,name,venue,status,owner_id,created_at,recording_started_at,finished_at,is_archived").or(`shoe_number.ilike.%${safe}%,name.ilike.%${safe}%,venue.ilike.%${safe}%`).order("created_at",{ascending:false}).limit(20);
     if(error)throw error;
     const rows=data||[];
     box.innerHTML=rows.length?rows.map(s=>`<button class="dashboard-search-row" data-search-shoe-id="${s.id}" type="button"><strong>${escapeHtml(s.shoe_number||"未命名")}</strong><span>${escapeHtml(s.venue||"未選場館")}｜${s.status==="open"?"進行中":"已完成"}｜${formatDate(s.finished_at||s.created_at)}</span></button>`).join(""):'<p class="empty">找不到符合的牌靴</p>';
@@ -635,9 +696,12 @@ $("newShoeButton").onclick=openShoeModal;$("finishShoeButton").onclick=finishCur
 $("manageShoesButton").onclick=openShoeManager;$("closeManagerModal").onclick=closeManagerModal;document.querySelector("[data-close-manager]").onclick=closeManagerModal;$("shoeSearchInput").oninput=renderShoeManager;$("shoeStatusFilter").onchange=renderShoeManager;
 $("closeDetailModal").onclick=closeDetailModal;document.querySelector("[data-close-detail]").onclick=closeDetailModal;$("closeEditModal").onclick=closeEditModal;$("cancelEditShoeButton").onclick=closeEditModal;document.querySelector("[data-close-edit]").onclick=closeEditModal;$("saveEditShoeButton").onclick=saveEditedShoe;
 $("dashboardButton").onclick=openDashboard;$("closeDashboardModal").onclick=closeDashboard;document.querySelector("[data-close-dashboard]").onclick=closeDashboard;$("refreshDashboardButton").onclick=()=>loadDashboard();$("dashboardShoeSearchButton").onclick=searchDashboardShoes;$("dashboardShoeSearchInput").addEventListener("keydown",e=>{if(e.key==="Enter")searchDashboardShoes()});
+$("openFinishedHistoryButton").onclick=openFinishedHistory;$("closeFinishedHistoryModal").onclick=closeFinishedHistory;document.querySelector("[data-close-finished-history]").onclick=closeFinishedHistory;$("finishedHistorySearch").addEventListener("input",renderFinishedHistory);
+$("openPersonnelStatsButton").onclick=openPersonnelStats;$("closePersonnelStatsModal").onclick=closePersonnelStats;document.querySelector("[data-close-personnel-stats]").onclick=closePersonnelStats;$("personnelSearch").addEventListener("input",renderPersonnelStats);
+$("closePersonnelDetailModal").onclick=closePersonnelDetail;document.querySelector("[data-close-personnel-detail]").onclick=closePersonnelDetail;
 $("userManagerButton").onclick=openUserManager;$("closeUserManagerModal").onclick=closeUserManager;document.querySelector("[data-close-users]").onclick=closeUserManager;$("createUserButton").onclick=createManagedUser;$("refreshUsersButton").onclick=loadManagedUsers;
 $("undoButton").onclick=deleteLastGame;$("refreshButton").onclick=async()=>{try{await Promise.all([loadCloudData(),loadVenues()])}catch(e){showMessage(appMessage,e.message||"重新整理失敗","error")}};$("loginButton").onclick=login;$("logoutButton").onclick=logout;
-document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("dashboardModal").classList.contains("hidden"))return closeDashboard();if(!$("userManagerModal").classList.contains("hidden"))return closeUserManager();if(!$("editShoeModal").classList.contains("hidden"))return closeEditModal();if(!$("shoeDetailModal").classList.contains("hidden"))return closeDetailModal();if(!$("shoeManagerModal").classList.contains("hidden"))return closeManagerModal();if(!$("newShoeModal").classList.contains("hidden"))return closeShoeModal()}if(e.key==="Enter"&&!loginPanel.classList.contains("hidden"))login()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("personnelDetailModal").classList.contains("hidden"))return closePersonnelDetail();if(!$("personnelStatsModal").classList.contains("hidden"))return closePersonnelStats();if(!$("finishedHistoryModal").classList.contains("hidden"))return closeFinishedHistory();if(!$("dashboardModal").classList.contains("hidden"))return closeDashboard();if(!$("userManagerModal").classList.contains("hidden"))return closeUserManager();if(!$("editShoeModal").classList.contains("hidden"))return closeEditModal();if(!$("shoeDetailModal").classList.contains("hidden"))return closeDetailModal();if(!$("shoeManagerModal").classList.contains("hidden"))return closeManagerModal();if(!$("newShoeModal").classList.contains("hidden"))return closeShoeModal()}if(e.key==="Enter"&&!loginPanel.classList.contains("hidden"))login()});
 
 renderCardInput();updateWinnerOnlyUI();updateRecordState();
 supabase.auth.onAuthStateChange(async(_event,session)=>session?await showAuthenticated(session):showLoggedOut());

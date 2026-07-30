@@ -4,13 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="dark light" />
-  <title>Baccarat Platform Studio v16.2.3 補牌點數即時更新</title>
+  <title>Baccarat Platform Studio v16.3</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="container">
     <header class="topbar">
-      <div><h1>Baccarat Platform Studio</h1><p>v16.2.3｜補牌點數即時更新</p></div>
+      <div><h1>Baccarat Platform Studio</h1><p>v16.3</p></div>
       <div id="userArea" class="user-area hidden">
         <div class="user-meta"><strong id="userDisplayName">—</strong><span id="userRoleBadge" class="role-badge">—</span></div>
         <button id="dashboardButton" class="primary hidden" type="button">管理總覽</button>
@@ -146,9 +146,39 @@
       </div>
       <div class="dashboard-grid">
         <section class="dashboard-panel"><div class="section-head"><h3>進行中的牌靴</h3><span id="dashboardShoeSummary" class="mini-badge">—</span></div><div id="dashboardActiveShoes" class="dashboard-list"><p class="empty">讀取中…</p></div></section>
-        <section class="dashboard-panel"><div class="section-head"><h3>最近完成牌靴</h3><span class="mini-badge">最近 10 副</span></div><div id="dashboardFinishedShoes" class="dashboard-list"><p class="empty">讀取中…</p></div></section>
+        <section class="dashboard-panel"><div class="section-head"><h3>最近完成牌靴</h3><button id="openFinishedHistoryButton" class="secondary compact" type="button">查看最近 50 副</button></div><div id="dashboardFinishedShoes" class="dashboard-list"><p class="empty">讀取中…</p></div></section>
       </div>
+      <section class="dashboard-panel dashboard-people-entry"><div class="section-head"><div><h3>人員記錄統計</h3><p class="section-note">查看每位人員近期完成的牌靴與細項資料。</p></div><button id="openPersonnelStatsButton" class="primary" type="button">查看人員記錄</button></div></section>
       <section class="dashboard-panel dashboard-activity-panel"><div class="section-head"><h3>最近活動</h3><span class="mini-badge">建立與完成</span></div><div id="dashboardActivity" class="dashboard-list"><p class="empty">讀取中…</p></div></section>
+    </section>
+  </div>
+
+  <div id="finishedHistoryModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="finishedHistoryTitle">
+    <div class="modal-backdrop" data-close-finished-history="true"></div>
+    <section class="modal-card manager-card admin-detail-card">
+      <div class="section-head"><div><h2 id="finishedHistoryTitle">最近完成的牌靴</h2><p class="section-note">依完成時間由新到舊，最多顯示 50 副。點擊任一牌靴可查看完整逐局資料。</p></div><button id="closeFinishedHistoryModal" class="icon-button" type="button" aria-label="關閉">×</button></div>
+      <div class="admin-filter-row"><input id="finishedHistorySearch" type="search" placeholder="搜尋牌靴名稱、場館或記錄者" /><span id="finishedHistoryCount" class="mini-badge">0 副</span></div>
+      <p id="finishedHistoryMessage" class="message"></p>
+      <div id="finishedHistoryList" class="admin-record-list"><p class="empty">讀取中…</p></div>
+    </section>
+  </div>
+
+  <div id="personnelStatsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="personnelStatsTitle">
+    <div class="modal-backdrop" data-close-personnel-stats="true"></div>
+    <section class="modal-card manager-card admin-detail-card">
+      <div class="section-head"><div><h2 id="personnelStatsTitle">人員記錄統計</h2><p class="section-note">點擊人員可查看該人員最近完成的牌靴與細項。</p></div><button id="closePersonnelStatsModal" class="icon-button" type="button" aria-label="關閉">×</button></div>
+      <div class="admin-filter-row"><input id="personnelSearch" type="search" placeholder="搜尋人員名稱或帳號" /><span id="personnelCount" class="mini-badge">0 人</span></div>
+      <p id="personnelStatsMessage" class="message"></p>
+      <div id="personnelStatsList" class="personnel-stats-list"><p class="empty">讀取中…</p></div>
+    </section>
+  </div>
+
+  <div id="personnelDetailModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="personnelDetailTitle">
+    <div class="modal-backdrop" data-close-personnel-detail="true"></div>
+    <section class="modal-card manager-card admin-detail-card">
+      <div class="section-head"><div><h2 id="personnelDetailTitle">人員牌靴細項</h2><p id="personnelDetailMeta" class="section-note">—</p></div><button id="closePersonnelDetailModal" class="icon-button" type="button" aria-label="關閉">×</button></div>
+      <div id="personnelDetailSummary" class="personnel-summary"></div>
+      <div id="personnelDetailList" class="admin-record-list"><p class="empty">讀取中…</p></div>
     </section>
   </div>
 
