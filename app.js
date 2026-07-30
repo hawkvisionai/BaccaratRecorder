@@ -344,13 +344,13 @@ async function loadDashboard(silent=false){
   try{
     const today=startOfTodayIso();
     const [activeR,todayFinishedR,todayGamesR,totalShoesR,totalGamesR,recentShoesR,finishedR]=await Promise.all([
-      supabase.from("shoes").select("id,shoe_number,name,venue,status,created_at,finished_at,is_archived").eq("status","open").eq("is_archived",false).order("created_at",{ascending:false}),
+      supabase.from("shoes").select("id,shoe_number,name,venue,status,created_at,recording_started_at,finished_at,is_archived").eq("status","open").eq("is_archived",false).order("created_at",{ascending:false}),
       supabase.from("shoes").select("id",{count:"exact",head:true}).gte("finished_at",today).eq("is_archived",false),
       supabase.from("games").select("id",{count:"exact",head:true}).gte("created_at",today),
       supabase.from("shoes").select("id",{count:"exact",head:true}).eq("is_archived",false),
       supabase.from("games").select("id",{count:"exact",head:true}),
-      supabase.from("shoes").select("id,shoe_number,name,venue,status,created_at,finished_at,is_archived").order("created_at",{ascending:false}).limit(30),
-      supabase.from("shoes").select("id,shoe_number,name,venue,status,created_at,finished_at,is_archived").not("finished_at","is",null).eq("is_archived",false).order("finished_at",{ascending:false}).limit(10)
+      supabase.from("shoes").select("id,shoe_number,name,venue,status,created_at,recording_started_at,finished_at,is_archived").order("created_at",{ascending:false}).limit(30),
+      supabase.from("shoes").select("id,shoe_number,name,venue,status,created_at,recording_started_at,finished_at,is_archived").not("finished_at","is",null).eq("is_archived",false).order("finished_at",{ascending:false}).limit(10)
     ]);
     const responses=[activeR,todayFinishedR,todayGamesR,totalShoesR,totalGamesR,recentShoesR,finishedR];
     const err=responses.find(r=>r.error)?.error;if(err)throw err;
@@ -373,7 +373,7 @@ function formatDuration(start,end){
   return m?`${h} 小時 ${m} 分`:`${h} 小時`;
 }
 function dashboardShoeRow(s,finished=false){
-  return `<button class="dashboard-row shoe dashboard-open-shoe" data-shoe-id="${s.id}" type="button"><div class="dashboard-row-main"><strong>${escapeHtml(s.shoe_number||"未命名")}</strong><small>${escapeHtml(s.venue||"未選場館")}${s.name&&s.name!==s.shoe_number?`｜${escapeHtml(s.name)}`:""}</small></div><div class="dashboard-shoe-count"><strong>${s.count||0}</strong><small>局</small></div><span class="dashboard-time">${finished?`${formatDate(s.finished_at)}｜${formatDuration(s.created_at,s.finished_at)}`:(s.last_at?`最後記錄 ${formatDate(s.last_at)}`:`開始 ${formatDate(s.created_at)}`)}</span></button>`;
+  return `<button class="dashboard-row shoe dashboard-open-shoe" data-shoe-id="${s.id}" type="button"><div class="dashboard-row-main"><strong>${escapeHtml(s.shoe_number||"未命名")}</strong><small>${escapeHtml(s.venue||"未選場館")}${s.name&&s.name!==s.shoe_number?`｜${escapeHtml(s.name)}`:""}</small></div><div class="dashboard-shoe-count"><strong>${s.count||0}</strong><small>局</small></div><span class="dashboard-time">${finished?`${formatDate(s.finished_at)}｜記錄時長：${s.recording_started_at?formatDuration(s.recording_started_at,s.finished_at):"尚未開始記錄"}`:(s.last_at?`最後記錄 ${formatDate(s.last_at)}`:`開始 ${formatDate(s.created_at)}`)}</span></button>`;
 }
 function bindDashboardShoeRows(){
   document.querySelectorAll(".dashboard-open-shoe").forEach(b=>b.onclick=async()=>{
@@ -400,7 +400,7 @@ async function searchDashboardShoes(){
   box.classList.remove("hidden");box.innerHTML='<p class="empty">搜尋中…</p>';
   const safe=q.replace(/[%_,]/g," ").trim();
   try{
-    const {data,error}=await supabase.from("shoes").select("id,shoe_number,name,venue,status,created_at,finished_at,is_archived").or(`shoe_number.ilike.%${safe}%,name.ilike.%${safe}%,venue.ilike.%${safe}%`).order("created_at",{ascending:false}).limit(20);
+    const {data,error}=await supabase.from("shoes").select("id,shoe_number,name,venue,status,created_at,recording_started_at,finished_at,is_archived").or(`shoe_number.ilike.%${safe}%,name.ilike.%${safe}%,venue.ilike.%${safe}%`).order("created_at",{ascending:false}).limit(20);
     if(error)throw error;
     const rows=data||[];
     box.innerHTML=rows.length?rows.map(s=>`<button class="dashboard-search-row" data-search-shoe-id="${s.id}" type="button"><strong>${escapeHtml(s.shoe_number||"未命名")}</strong><span>${escapeHtml(s.venue||"未選場館")}｜${s.status==="open"?"進行中":"已完成"}｜${formatDate(s.finished_at||s.created_at)}</span></button>`).join(""):'<p class="empty">找不到符合的牌靴</p>';
