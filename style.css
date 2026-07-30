@@ -125,3 +125,16 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .detail-card-grid small,.detail-card-grid b{display:block}
 .detail-card-grid small{color:var(--muted);font-size:11px;margin-bottom:3px}
 @media(max-width:560px){.detail-card-grid{grid-template-columns:1fr}}
+
+/* v16.3.1：管理首頁直接展開人員統計、記錄者唯讀歷史牌靴 */
+.dashboard-personnel-inline{margin-top:14px}
+.dashboard-personnel-inline .admin-filter-row{margin-bottom:12px}
+.dashboard-personnel-inline .personnel-stats-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+.recorder-history-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.recorder-history-card::after{content:"唯讀查看各局細項 ›"}
+#myRecentShoesButton{grid-column:1/-1}
+@media(max-width:760px){
+  .dashboard-personnel-inline .personnel-stats-list{grid-template-columns:1fr}
+  .recorder-history-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:430px){.recorder-history-grid{grid-template-columns:1fr}}

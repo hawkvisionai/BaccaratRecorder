@@ -4,13 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="dark light" />
-  <title>Baccarat Platform Studio v16.3</title>
+  <title>Baccarat Platform Studio v16.3.1</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="container">
     <header class="topbar">
-      <div><h1>Baccarat Platform Studio</h1><p>v16.3</p></div>
+      <div><h1>Baccarat Platform Studio</h1><p>v16.3.1</p></div>
       <div id="userArea" class="user-area hidden">
         <div class="user-meta"><strong id="userDisplayName">—</strong><span id="userRoleBadge" class="role-badge">—</span></div>
         <button id="dashboardButton" class="primary hidden" type="button">管理總覽</button>
@@ -76,6 +76,7 @@
         <div class="action-grid">
           <button id="undoButton" class="secondary" type="button">刪除上一局</button>
           <button id="newShoeButton" class="success" type="button">新增牌靴</button><button id="finishShoeButton" class="archive" type="button">完成牌靴</button>
+          <button id="myRecentShoesButton" class="primary" type="button">查看我的最近牌靴</button>
           <button id="manageShoesButton" class="warning" type="button">牌靴管理</button>
         </div>
       </section>
@@ -148,8 +149,21 @@
         <section class="dashboard-panel"><div class="section-head"><h3>進行中的牌靴</h3><span id="dashboardShoeSummary" class="mini-badge">—</span></div><div id="dashboardActiveShoes" class="dashboard-list"><p class="empty">讀取中…</p></div></section>
         <section class="dashboard-panel"><div class="section-head"><h3>最近完成牌靴</h3><button id="openFinishedHistoryButton" class="secondary compact" type="button">查看最近 50 副</button></div><div id="dashboardFinishedShoes" class="dashboard-list"><p class="empty">讀取中…</p></div></section>
       </div>
-      <section class="dashboard-panel dashboard-people-entry"><div class="section-head"><div><h3>人員記錄統計</h3><p class="section-note">查看每位人員近期完成的牌靴與細項資料。</p></div><button id="openPersonnelStatsButton" class="primary" type="button">查看人員記錄</button></div></section>
-      <section class="dashboard-panel dashboard-activity-panel"><div class="section-head"><h3>最近活動</h3><span class="mini-badge">建立與完成</span></div><div id="dashboardActivity" class="dashboard-list"><p class="empty">讀取中…</p></div></section>
+      <section class="dashboard-panel dashboard-personnel-inline">
+        <div class="section-head"><div><h3>人員記錄統計</h3><p class="section-note">點擊人員可查看最近完成的牌靴與各局細項。</p></div><span id="dashboardPersonnelCount" class="mini-badge">0 人</span></div>
+        <div class="admin-filter-row"><input id="dashboardPersonnelSearch" type="search" placeholder="搜尋人員名稱或帳號" /></div>
+        <p id="dashboardPersonnelMessage" class="message"></p>
+        <div id="dashboardPersonnelList" class="personnel-stats-list"><p class="empty">讀取中…</p></div>
+      </section>
+    </section>
+  </div>
+
+  <div id="myRecentShoesModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="myRecentShoesTitle">
+    <div class="modal-backdrop" data-close-my-recent-shoes="true"></div>
+    <section class="modal-card manager-card admin-detail-card">
+      <div class="section-head"><div><h2 id="myRecentShoesTitle">我的最近牌靴</h2><p class="section-note">最近完成的 20 副牌靴。點擊牌靴可唯讀查看各局細項。</p></div><button id="closeMyRecentShoesModal" class="icon-button" type="button" aria-label="關閉">×</button></div>
+      <p id="myRecentShoesMessage" class="message"></p>
+      <div id="myRecentShoesList" class="admin-record-list"><p class="empty">讀取中…</p></div>
     </section>
   </div>
 
