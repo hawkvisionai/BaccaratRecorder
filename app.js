@@ -150,7 +150,7 @@ function editCard(side,index){
 function handDisplay(side,label){
   const cards=cardState[side];
   const initialReady=!!cards[0]&&!!cards[1];
-  const point=initialReady?handPoints(cards.slice(0,2)):null;
+  const point=initialReady?handPoints(cards):null;
   const cardButton=(rank,index)=>`<button type="button" class="table-card ${rank?"filled":"empty"}" data-edit-side="${side}" data-edit-index="${index}" ${rank?"":"disabled"}>${rank||"·"}</button>`;
   return `<div class="table-hand ${side}">
     <div class="table-hand-head"><strong>${label}</strong>${initialReady?`<span class="initial-points">＋${point}</span>`:""}</div>
