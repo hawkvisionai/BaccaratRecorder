@@ -813,56 +813,60 @@ async function captureAiCameraFrame(){
   }
 }
 
-async function loadCaptureImage(file,maxWidth=1600){
+async function loadCaptureImage(file,maxWidth=1200){
   const bitmap=await createImageBitmap(file);
   const scale=Math.min(1,maxWidth/bitmap.width);
   const canvas=document.createElement("canvas");
   canvas.width=Math.max(1,Math.round(bitmap.width*scale));
   canvas.height=Math.max(1,Math.round(bitmap.height*scale));
-  canvas.getContext("2d",{alpha:false}).drawImage(bitmap,0,0,canvas.width,canvas.height);
+  const ctx=canvas.getContext("2d",{alpha:false});
+  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
+  ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);
   bitmap.close?.();
   return canvas;
 }
-function cropCanvasDataUrl(source,box,quality=.9){
+function cropToCanvas(source,box,width,height){
   const sx=Math.max(0,Math.round(source.width*box.x));
   const sy=Math.max(0,Math.round(source.height*box.y));
   const sw=Math.max(1,Math.min(source.width-sx,Math.round(source.width*box.w)));
   const sh=Math.max(1,Math.min(source.height-sy,Math.round(source.height*box.h)));
-  const canvas=document.createElement("canvas");
-  const boost=Math.min(2.4,900/Math.max(sw,sh));
-  canvas.width=Math.max(220,Math.round(sw*boost));
-  canvas.height=Math.max(220,Math.round(sh*boost));
-  const ctx=canvas.getContext("2d",{alpha:false});
+  const canvas=document.createElement("canvas");canvas.width=width;canvas.height=height;
+  const ctx=canvas.getContext("2d",{alpha:false});ctx.fillStyle="#101827";ctx.fillRect(0,0,width,height);
   ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
-  ctx.drawImage(source,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
-  return canvas.toDataURL("image/jpeg",quality);
+  const scale=Math.min(width/sw,height/sh),dw=sw*scale,dh=sh*scale;
+  ctx.drawImage(source,sx,sy,sw,sh,(width-dw)/2,(height-dh)/2,dw,dh);
+  return canvas;
 }
-async function buildCaptureImages(file){
-  const source=await loadCaptureImage(file);
-  /* v16.4.6：相機取景框已只保留開牌區。以下比例直接切該框內的計分列與六個牌位。 */
+async function buildCaptureSheet(file){
+  const source=await loadCaptureImage(file,1200);
+  /* v16.4.7：一次建立固定六格辨識合成圖，只上傳一張圖，降低傳輸量與模型往返時間。 */
   const boxes={
-    scoreboard:{x:.00,y:.00,w:1.00,h:.27},
-    table:{x:.00,y:.08,w:1.00,h:.92},
-    player_1:{x:.015,y:.245,w:.225,h:.46},
-    player_2:{x:.225,y:.245,w:.225,h:.46},
-    player_3:{x:.095,y:.56,w:.31,h:.42},
-    banker_1:{x:.55,y:.245,w:.225,h:.46},
-    banker_2:{x:.76,y:.245,w:.225,h:.46},
-    banker_3:{x:.595,y:.56,w:.31,h:.42}
+    player_1:{x:.01,y:.23,w:.235,h:.47}, player_2:{x:.215,y:.23,w:.235,h:.47}, player_3:{x:.075,y:.53,w:.35,h:.46},
+    banker_1:{x:.545,y:.23,w:.235,h:.47}, banker_2:{x:.75,y:.23,w:.235,h:.47}, banker_3:{x:.575,y:.53,w:.35,h:.46}
   };
-  const images={full:source.toDataURL("image/jpeg",.88)};
-  for(const [name,box] of Object.entries(boxes))images[name]=cropCanvasDataUrl(source,box,.93);
+  const sheet=document.createElement("canvas");sheet.width=1200;sheet.height=1040;
+  const ctx=sheet.getContext("2d",{alpha:false});ctx.fillStyle="#0b1220";ctx.fillRect(0,0,sheet.width,sheet.height);
+  ctx.fillStyle="#fff";ctx.font="bold 30px sans-serif";ctx.textAlign="left";ctx.fillText("ORIGINAL OPENING AREA",28,38);
+  const overview=cropToCanvas(source,{x:0,y:0,w:1,h:1},1144,330);ctx.drawImage(overview,28,54);
+  const order=[["player_1","PLAYER 1"],["player_2","PLAYER 2"],["player_3","PLAYER 3"],["banker_1","BANKER 1"],["banker_2","BANKER 2"],["banker_3","BANKER 3"]];
+  const cellW=360,cellH=280,gap=30,startX=30,startY=420;
+  order.forEach(([key,label],i)=>{
+    const col=i%3,row=Math.floor(i/3),x=startX+col*(cellW+gap),y=startY+row*(cellH+55);
+    ctx.fillStyle="#fff";ctx.font="bold 27px sans-serif";ctx.fillText(label,x,y-10);
+    ctx.strokeStyle="#7aa2ff";ctx.lineWidth=4;ctx.strokeRect(x,y,cellW,cellH);
+    const crop=cropToCanvas(source,boxes[key],cellW,cellH);ctx.drawImage(crop,x,y);
+  });
   source.width=1;source.height=1;
-  return images;
+  return sheet.toDataURL("image/jpeg",.76);
 }
 async function analyzeCapturedPhoto(file){
   if(!file||!aiAllowed()||busy)return;
   resetAiCapture();aiCapture.file=file;aiCapture.objectUrl=URL.createObjectURL(file);aiCapture.recognizing=true;
   cardState=freshCardState();renderCardInput();updateRecordState();setBusy(true);
   try{
-    const images=await buildCaptureImages(file);
+    const image=await buildCaptureSheet(file);
     const {data:{session}}=await supabase.auth.getSession();if(!session)throw new Error("登入已失效");
-    const response=await fetch(AI_CAPTURE_FUNCTION_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:JSON.stringify({images,template:"guided_opening_frame_v2"})});
+    const response=await fetch(AI_CAPTURE_FUNCTION_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:JSON.stringify({image,template:"fixed_six_slot_sheet_v1"})});
     const result=await response.json().catch(()=>({}));if(!response.ok||result.ok===false)throw new Error(result.error||result.warning||`辨識服務錯誤（${response.status}）`);
     const cards=result.cards||{};
     cardState={player:[cards.player_1||null,cards.player_2||null,cards.player_3||null],banker:[cards.banker_1||null,cards.banker_2||null,cards.banker_3||null],active:"complete"};
@@ -872,9 +876,7 @@ async function analyzeCapturedPhoto(file){
     aiCapture.warning=result.warning||"";
     showSaveToast("✓ 辨識完成，請人工核對");
   }catch(e){
-    console.error(e);cardState=freshCardState();
-    showMessage(appMessage,e.message||"辨識失敗，請重新拍照","error");
-    aiCapture.warning=e.message||"辨識失敗，請重新拍照";
+    console.error(e);cardState=freshCardState();showMessage(appMessage,e.message||"辨識失敗，請重新拍照","error");aiCapture.warning=e.message||"辨識失敗，請重新拍照";
   }finally{aiCapture.recognizing=false;setBusy(false);renderCardInput();updateRecordState();}
 }
 async function callUserAdmin(action,payload={}){
