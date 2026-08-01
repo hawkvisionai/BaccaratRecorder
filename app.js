@@ -4,6 +4,7 @@ const SUPABASE_URL = "https://rwxujvpakpemiwkitltk.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_aN_1_fzAV3hR6FmW7FTZGg_6SF0MUHF";
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 const USER_ADMIN_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/manage-users`;
+const AI_CAPTURE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/analyze-capture`;
 const $ = id => document.getElementById(id);
 
 const RANKS = ["A","2","3","4","5","6","7","8","9","10","J","Q","K"];
@@ -14,6 +15,8 @@ let currentShoe = null;
 let currentGames = [];
 let busy = false;
 let mode = "complete";
+let inputMethod = "manual";
+let aiCapture = freshAiCapture();
 let venueOptions = [];
 let allShoes = [];
 let editingShoe = null;
@@ -49,6 +52,16 @@ function freshCardState(){
 function freshWinnerOnlyState(){
   return { winner:null, playerPair:false, bankerPair:false, superSix:false };
 }
+function freshAiCapture(){
+  return { file:null, objectUrl:null, editing:null, recognizing:false, warning:"", expectedPlayerPoints:null, expectedBankerPoints:null };
+}
+function aiAllowed(){ return currentProfile?.role==="admin" || currentProfile?.ai_capture_enabled===true; }
+function releaseAiPhoto(){
+  if(aiCapture.objectUrl) URL.revokeObjectURL(aiCapture.objectUrl);
+  aiCapture=freshAiCapture();
+  const input=$("aiCameraInput"); if(input) input.value="";
+}
+function resetAiCapture(){ releaseAiPhoto(); }
 function setSync(text,type="pending"){
   const el=$("syncStatus"); el.textContent=text; el.className=`status ${type}`;
 }
@@ -155,31 +168,64 @@ function handDisplay(side,label){
   const cards=cardState[side];
   const initialReady=!!cards[0]&&!!cards[1];
   const point=initialReady?handPoints(cards):null;
-  const cardButton=(rank,index)=>`<button type="button" class="table-card ${rank?"filled":"empty"}" data-edit-side="${side}" data-edit-index="${index}" ${rank?"":"disabled"}>${rank||"·"}</button>`;
+  const aiMode=inputMethod==="ai";
+  const cardButton=(rank,index)=>`<button type="button" class="table-card ${rank?"filled":"empty"} ${aiMode?"editable-slot":""}" data-edit-side="${side}" data-edit-index="${index}" ${!aiMode&&!rank?"disabled":""}>${rank||(aiMode?"－":"·")}</button>`;
   return `<div class="table-hand ${side}">
     <div class="table-hand-head"><strong>${label}</strong>${initialReady?`<span class="initial-points">＋${point}</span>`:""}</div>
     <div class="initial-cards">${cardButton(cards[0],0)}${cardButton(cards[1],1)}</div>
-    <div class="third-card-row">${cards[2]?cardButton(cards[2],2):'<span class="third-card-placeholder"></span>'}</div>
+    <div class="third-card-row">${aiMode?cardButton(cards[2],2):(cards[2]?cardButton(cards[2],2):'<span class="third-card-placeholder"></span>')}</div>
   </div>`;
 }
 function activeInputLabel(active){
   return ({playerInitial:"閒",bankerInitial:"莊",player2:"閒補牌",banker2:"莊補牌"})[active]||"本局完成";
 }
+function aiValidation(){
+  const [p1,p2,p3]=cardState.player,[b1,b2,b3]=cardState.banker;
+  if(!p1||!p2||!b1||!b2) return {complete:false,valid:false,message:aiCapture.objectUrl?"請人工確認此局":"等待拍照"};
+  const pTwo=handPoints([p1,p2]),bTwo=handPoints([b1,b2]);
+  const natural=isNatural(pTwo,bTwo);
+  const pShould=natural?false:playerNeedsThird(pTwo,bTwo);
+  const bShould=natural?false:bankerNeedsThird(bTwo,pShould,p3);
+  const rulesOk=(pShould===!!p3)&&(bShould===!!b3);
+  const pFinal=handPoints([p1,p2,p3]),bFinal=handPoints([b1,b2,b3]);
+  const totalsOk=(aiCapture.expectedPlayerPoints===null||aiCapture.expectedPlayerPoints===pFinal)&&(aiCapture.expectedBankerPoints===null||aiCapture.expectedBankerPoints===bFinal);
+  return {complete:true,valid:rulesOk&&totalsOk,message:rulesOk&&totalsOk?"資料合理":"請人工確認此局"};
+}
+function chooseAiSlot(side,index){
+  aiCapture.editing={side,index};
+  renderCardInput();
+}
+function setAiSlot(rank){
+  if(!aiCapture.editing)return;
+  const {side,index}=aiCapture.editing;
+  cardState[side][index]=rank||null;
+  aiCapture.editing=null;
+  aiCapture.expectedPlayerPoints=null; aiCapture.expectedBankerPoints=null;
+  renderCardInput();updateRecordState();
+}
+function renderAiEditor(){
+  if(!aiCapture.editing)return "";
+  const third=aiCapture.editing.index===2;
+  return `<section class="combined-card-input ai-rank-editor"><div class="combined-input-title">修改${aiCapture.editing.side==="player"?"閒":"莊"}${aiCapture.editing.index+1}張</div><div class="rank-grid">${RANKS.map(rank=>`<button type="button" class="rank-button" data-ai-rank="${rank}">${rank}</button>`).join("")}${third?'<button type="button" class="rank-button clear-rank" data-ai-rank="">清除</button>':""}</div></section>`;
+}
 function renderCardInput(){
+  const aiMode=inputMethod==="ai";
   const progress=completeProgress();
-  if(cardState.active==="complete"&&!progress.complete) cardState.active=activeInputFromProgress();
+  if(!aiMode && cardState.active==="complete"&&!progress.complete) cardState.active=activeInputFromProgress();
   const active=cardState.active;
-  const showRankGrid=!progress.complete;
+  const showRankGrid=!aiMode&&!progress.complete;
+  const photo=aiMode&&aiCapture.objectUrl?`<div class="capture-preview-wrap"><img class="capture-preview" src="${aiCapture.objectUrl}" alt="本局拍照預覽" /></div>`:"";
   $("cardSteps").innerHTML=`
-    <div class="baccarat-table-layout">
+    <div class="baccarat-table-layout ${aiMode?"ai-table":""}">
       ${handDisplay("player","閒")}
       <div class="table-divider"></div>
       ${handDisplay("banker","莊")}
     </div>
-    ${showRankGrid?`<section class="combined-card-input"><div class="combined-input-title">${activeInputLabel(active)}</div><div class="rank-grid">${RANKS.map(rank=>`<button type="button" class="rank-button" data-active-rank="${rank}">${rank}</button>`).join("")}</div></section>`:""}`;
+    ${aiMode?`${renderAiEditor()}${photo}`:(showRankGrid?`<section class="combined-card-input"><div class="combined-input-title">${activeInputLabel(active)}</div><div class="rank-grid">${RANKS.map(rank=>`<button type="button" class="rank-button" data-active-rank="${rank}">${rank}</button>`).join("")}</div></section>`:"")}`;
   document.querySelectorAll("[data-active-rank]").forEach(b=>b.onclick=()=>selectActiveRank(b.dataset.activeRank));
-  document.querySelectorAll("[data-edit-side]").forEach(b=>b.onclick=()=>editCard(b.dataset.editSide,Number(b.dataset.editIndex)));
-  const d=completeDerived();
+  document.querySelectorAll("[data-edit-side]").forEach(b=>b.onclick=()=>aiMode?chooseAiSlot(b.dataset.editSide,Number(b.dataset.editIndex)):editCard(b.dataset.editSide,Number(b.dataset.editIndex)));
+  document.querySelectorAll("[data-ai-rank]").forEach(b=>b.onclick=()=>setAiSlot(b.dataset.aiRank||null));
+  const d=aiMode?(aiValidation().complete?completeDerived():null):completeDerived();
   $("completeSummary").classList.toggle("hidden",!d);
   $("completeSummary").classList.remove("result-player","result-banker","result-tie");
   if(d){
@@ -201,25 +247,41 @@ function updateWinnerOnlyUI(){
   if(winnerOnlyState.winner!=="莊") winnerOnlyState.superSix=false;
   setToggle("winnerSuperSix",winnerOnlyState.superSix);
 }
-function isRecordComplete(){ return mode==="complete" ? completeProgress().complete : !!winnerOnlyState.winner; }
+function isRecordComplete(){ return mode==="complete" ? (inputMethod==="ai"?aiValidation().complete&&aiValidation().valid:completeProgress().complete) : !!winnerOnlyState.winner; }
 function updateRecordState(){
   const complete=isRecordComplete();
-  const state=$("recordState"); state.textContent=complete?"合理":"尚未輸入完整"; state.className=`record-state ${complete?"valid":"incomplete"}`;
+  const state=$("recordState");
+  if(mode==="complete"&&inputMethod==="ai"){
+    const v=aiValidation();
+    const text=aiCapture.recognizing?"AI 辨識中":v.message;
+    const cls=aiCapture.recognizing?"pending":v.valid?"valid":aiCapture.objectUrl?"warning":"incomplete";
+    state.textContent=text;state.className=`record-state ${cls}`;
+  }else{state.textContent=complete?"合理":"尚未輸入完整";state.className=`record-state ${complete?"valid":"incomplete"}`;}
   const can=!!currentShoe&&currentShoe.status==="open"&&!busy&&complete;
   $("nextRoundButton").disabled=!can;
 }
 function resetRound({resetMode=false}={}){
-  cardState=freshCardState(); winnerOnlyState=freshWinnerOnlyState();
+  cardState=freshCardState(); winnerOnlyState=freshWinnerOnlyState(); resetAiCapture();
   if(resetMode) setMode("complete"); else {renderCardInput();updateWinnerOnlyUI();updateRecordState();}
 }
 function nextGameNumber(){ return currentGames.length?Math.max(...currentGames.map(g=>Number(g.game_number)||0))+1:1; }
 function setMode(next){
   mode=next;
+  if(next!=="complete"&&inputMethod==="ai")setInputMethod("manual",{preserve:true});
   $("modeComplete").classList.toggle("active",next==="complete");
   $("modeWinnerOnly").classList.toggle("active",next==="winner_only");
   $("completePanel").classList.toggle("hidden",next!=="complete");
   $("winnerOnlyPanel").classList.toggle("hidden",next!=="winner_only");
   renderCardInput(); updateWinnerOnlyUI(); updateRecordState();
+}
+function setInputMethod(next,{preserve=false}={}){
+  if(next==="ai"&&!aiAllowed())return;
+  if(!preserve){cardState=freshCardState();resetAiCapture();}
+  inputMethod=next;
+  $("manualInputMethod").classList.toggle("active",next==="manual");
+  $("aiInputMethod").classList.toggle("active",next==="ai");
+  $("aiCaptureControls").classList.toggle("hidden",next!=="ai");
+  renderCardInput();updateRecordState();
 }
 function renderExtra(g){
   const items=[];
@@ -645,7 +707,7 @@ async function login(){
 }
 async function logout(){await supabase.auth.signOut()}
 async function loadCurrentProfile(user){
-  const {data,error}=await supabase.from("profiles").select("id,email,username,display_name,role,is_active").eq("id",user.id).maybeSingle();
+  const {data,error}=await supabase.from("profiles").select("id,email,username,display_name,role,is_active,ai_capture_enabled").eq("id",user.id).maybeSingle();
   if(error) throw error;
   if(!data) throw new Error("找不到使用者資料，請先執行 v16.1.0 資料庫升級 SQL");
   if(data.is_active===false){await supabase.auth.signOut();throw new Error("此帳號已被停用，請聯絡管理員");}
@@ -659,6 +721,9 @@ function applyRoleUI(){
   $("manageShoesButton").classList.toggle("hidden",!isAdmin);
   $("userManagerButton").classList.toggle("hidden",!isAdmin);
   $("dashboardButton").classList.toggle("hidden",!isAdmin);
+  const allowAi=aiAllowed();
+  $("aiInputMethod").classList.toggle("hidden",!allowAi);
+  if(!allowAi&&inputMethod==="ai")setInputMethod("manual");
   if(!isAdmin && !document.getElementById("recorderNotice")){
     const note=document.createElement("div");note.id="recorderNotice";note.className="recorder-note";
     note.textContent="記錄員模式：可建立與記錄牌靴；牌靴管理功能僅限管理員。";
@@ -682,6 +747,31 @@ async function showAuthenticated(session){
 function showLoggedOut(){stopRealtime();loginPanel.classList.remove("hidden");appPanel.classList.add("hidden");userArea.classList.add("hidden");currentUser=null;currentProfile=null;currentShoe=null;currentGames=[];setSync("準備中","pending")}
 
 
+async function fileToDataUrl(file,maxWidth=1280,quality=.82){
+  const bitmap=await createImageBitmap(file);
+  const scale=Math.min(1,maxWidth/bitmap.width);
+  const canvas=document.createElement("canvas");canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale);
+  canvas.getContext("2d").drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();
+  return canvas.toDataURL("image/jpeg",quality);
+}
+async function analyzeCapturedPhoto(file){
+  if(!file||!aiAllowed()||busy)return;
+  resetAiCapture();aiCapture.file=file;aiCapture.objectUrl=URL.createObjectURL(file);aiCapture.recognizing=true;
+  renderCardInput();updateRecordState();setBusy(true);
+  try{
+    const image=await fileToDataUrl(file);
+    const {data:{session}}=await supabase.auth.getSession();if(!session)throw new Error("登入已失效");
+    const response=await fetch(AI_CAPTURE_FUNCTION_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:JSON.stringify({image})});
+    const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||`辨識服務錯誤（${response.status}）`);
+    const cards=result.cards||{};
+    cardState={player:[cards.player_1||null,cards.player_2||null,cards.player_3||null],banker:[cards.banker_1||null,cards.banker_2||null,cards.banker_3||null],active:"complete"};
+    aiCapture.expectedPlayerPoints=Number.isInteger(result.player_points)?result.player_points:null;
+    aiCapture.expectedBankerPoints=Number.isInteger(result.banker_points)?result.banker_points:null;
+    aiCapture.warning=result.warning||"";
+    showSaveToast("✓ 辨識完成，請人工核對");
+  }catch(e){console.error(e);showMessage(appMessage,e.message||"照片辨識失敗","error");aiCapture.warning=e.message||"辨識失敗";}
+  finally{aiCapture.recognizing=false;setBusy(false);renderCardInput();updateRecordState();}
+}
 async function callUserAdmin(action,payload={}){
   const {data:{session}}=await supabase.auth.getSession();
   if(!session) throw new Error("登入已失效，請重新登入");
@@ -704,8 +794,8 @@ async function loadManagedUsers(){
 }
 function renderManagedUsers(){
   $("userManagerList").innerHTML=managedUsers.length?managedUsers.map(u=>{
-    const admin=u.role==="admin",self=u.id===currentUser?.id,active=u.is_active!==false;
-    const online=isOnlineUser(u.id);return `<div class="user-manager-row"><div><strong><span class="presence-dot ${online?"online":"offline"}"></span>${escapeHtml(u.display_name||u.email)}</strong><small>${escapeHtml(u.username||u.email)}｜${online?"目前在線":"目前離線"}</small></div><span class="role-badge ${admin?"admin":"recorder"}">${admin?"管理員":"記錄員"}</span><span class="account-state ${active?"active":"disabled"}">${active?"啟用":"停用"}</span><div class="user-actions">${admin?"":`<button class="secondary" data-user-action="password" data-id="${u.id}">重設密碼</button><button class="${active?"danger":"success"}" data-user-action="active" data-id="${u.id}">${active?"停用":"啟用"}</button>`}${self?'<span class="self-label">目前帳號</span>':""}</div></div>`
+    const admin=u.role==="admin",self=u.id===currentUser?.id,active=u.is_active!==false,ai=admin||u.ai_capture_enabled===true;
+    const online=isOnlineUser(u.id);return `<div class="user-manager-row"><div><strong><span class="presence-dot ${online?"online":"offline"}"></span>${escapeHtml(u.display_name||u.email)}</strong><small>${escapeHtml(u.username||u.email)}｜${online?"目前在線":"目前離線"}</small></div><span class="role-badge ${admin?"admin":"recorder"}">${admin?"管理員":"記錄員"}</span><span class="account-state ${active?"active":"disabled"}">${active?"啟用":"停用"}</span><div class="ai-permission"><span>AI 辨識</span><i class="permission-light ${ai?"on":"off"}" aria-label="${ai?"可使用":"不可使用"}"></i></div><div class="user-actions">${admin?"":`<button class="secondary" data-user-action="password" data-id="${u.id}">重設密碼</button><button class="${active?"danger":"success"}" data-user-action="active" data-id="${u.id}">${active?"停用":"啟用"}</button><button class="secondary" data-user-action="ai" data-id="${u.id}">切換 AI</button>`}${self?'<span class="self-label">目前帳號</span>':""}</div></div>`
   }).join(""):'<p class="empty">尚無人員資料</p>';
   document.querySelectorAll("[data-user-action]").forEach(b=>b.onclick=()=>handleManagedUserAction(b.dataset.userAction,b.dataset.id));
 }
@@ -727,10 +817,18 @@ async function handleManagedUserAction(action,id){
     const active=user.is_active===false;if(!confirm(`確定要${active?"啟用":"停用"} ${user.display_name||user.email} 嗎？`))return;
     setBusy(true);try{await callUserAdmin("set_active",{user_id:id,is_active:active});showSaveToast(active?"✓ 帳號已啟用":"✓ 帳號已停用");await loadManagedUsers()}catch(e){showMessage($("userManagerMessage"),e.message||"操作失敗","error")}finally{setBusy(false)}
   }
+  if(action==="ai"){
+    const enabled=user.ai_capture_enabled!==true;
+    setBusy(true);try{await callUserAdmin("set_ai_capture",{user_id:id,enabled});showSaveToast(enabled?"✓ AI 辨識權限已開啟":"✓ AI 辨識權限已關閉");await loadManagedUsers()}catch(e){showMessage($("userManagerMessage"),e.message||"AI 權限更新失敗","error")}finally{setBusy(false)}
+  }
 }
 
 $("modeComplete").onclick=()=>setMode("complete");
 $("modeWinnerOnly").onclick=()=>setMode("winner_only");
+$("manualInputMethod").onclick=()=>setInputMethod("manual");
+$("aiInputMethod").onclick=()=>setInputMethod("ai");
+$("aiCameraButton").onclick=()=>$("aiCameraInput").click();
+$("aiCameraInput").onchange=e=>{const file=e.target.files?.[0];if(file)analyzeCapturedPhoto(file)};
 $("nextRoundButton").onclick=saveAndNext;
 document.querySelectorAll(".winner-button").forEach(b=>b.onclick=()=>{winnerOnlyState.winner=b.dataset.winner;if(winnerOnlyState.winner!=="莊")winnerOnlyState.superSix=false;updateWinnerOnlyUI();updateRecordState()});
 $("winnerPlayerPair").onclick=()=>{winnerOnlyState.playerPair=!winnerOnlyState.playerPair;updateWinnerOnlyUI()};

@@ -4,13 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="dark light" />
-  <title>Baccarat Platform Studio v16.3.1</title>
+  <title>Baccarat Platform Studio v16.4</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <main class="container">
     <header class="topbar">
-      <div><h1>Baccarat Platform Studio</h1><p>v16.3.1</p></div>
+      <div><h1>Baccarat Platform Studio</h1><p>v16.4</p></div>
       <div id="userArea" class="user-area hidden">
         <div class="user-meta"><strong id="userDisplayName">—</strong><span id="userRoleBadge" class="role-badge">—</span></div>
         <button id="dashboardButton" class="primary hidden" type="button">管理總覽</button>
@@ -54,6 +54,18 @@
         </div>
 
         <div id="completePanel">
+          <div id="captureMethodRow" class="capture-method-row">
+            <span>記錄方式</span>
+            <div class="capture-method-buttons">
+              <button id="manualInputMethod" class="method-button active" type="button">手動</button>
+              <button id="aiInputMethod" class="method-button hidden" type="button">AI 辨識</button>
+            </div>
+          </div>
+          <div id="aiCaptureControls" class="ai-capture-controls hidden">
+            <input id="aiCameraInput" class="camera-input" type="file" accept="image/*" capture="environment" />
+            <button id="aiCameraButton" class="primary camera-button" type="button">📷 拍照辨識</button>
+            <p class="ai-capture-note">照片只用於本局辨識與人工核對；儲存成功後立即從頁面記憶體清除。</p>
+          </div>
           <div id="cardSteps" class="card-steps"></div>
           <div id="completeSummary" class="complete-summary hidden"></div>
         </div>
