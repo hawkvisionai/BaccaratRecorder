@@ -57,7 +57,9 @@ function freshAiCapture(){
   return {
     file:null, objectUrl:null, editing:null, recognizing:false, warning:"",
     expectedPlayerPoints:null, expectedBankerPoints:null,
-    autoSlots:{player:[false,false,false],banker:[false,false,false]}
+    autoSlots:{player:[false,false,false],banker:[false,false,false]},
+    confirmed:{player:[false,false,false],banker:[false,false,false]},
+    diagnostics:null
   };
 }
 function aiAllowed(){ return currentProfile?.role==="admin" || currentProfile?.ai_capture_enabled===true; }
@@ -176,7 +178,10 @@ function handDisplay(side,label){
   const aiMode=inputMethod==="ai";
   const cardButton=(rank,index)=>{
     const autoRecognized=aiMode&&rank&&aiCapture.autoSlots?.[side]?.[index];
-    return `<button type="button" class="table-card ${rank?"filled":"empty"} ${aiMode?"editable-slot":""} ${autoRecognized?"ai-recognized":""}" data-edit-side="${side}" data-edit-index="${index}" ${!aiMode&&!rank?"disabled":""}>${rank||(aiMode?"－":"·")}</button>`;
+    const confirmed=aiMode&&aiCapture.confirmed?.[side]?.[index]===true;
+    const needsConfirm=aiMode&&!!aiCapture.objectUrl&&!confirmed;
+    const title=aiMode?(confirmed?"已人工確認":"點此確認或修改"):"";
+    return `<button type="button" title="${title}" class="table-card ${rank?"filled":"empty"} ${aiMode?"editable-slot":""} ${autoRecognized?"ai-recognized":""} ${needsConfirm?"ai-unconfirmed":""} ${confirmed?"ai-confirmed":""}" data-edit-side="${side}" data-edit-index="${index}" ${!aiMode&&!rank?"disabled":""}>${rank||(aiMode?"－":"·")}</button>`;
   };
   return `<div class="table-hand ${side}">
     <div class="table-hand-head"><strong>${label}</strong>${initialReady?`<span class="initial-points">＋${point}</span>`:""}</div>
@@ -189,7 +194,9 @@ function activeInputLabel(active){
 }
 function aiValidation(){
   const [p1,p2,p3]=cardState.player,[b1,b2,b3]=cardState.banker;
-  if(!p1||!p2||!b1||!b2) return {complete:false,valid:false,message:aiCapture.objectUrl?(aiCapture.warning||"請人工確認此局"):"等待拍照"};
+  const confirmedCount=[...(aiCapture.confirmed?.player||[]),...(aiCapture.confirmed?.banker||[])].filter(Boolean).length;
+  const allConfirmed=confirmedCount===6;
+  if(!p1||!p2||!b1||!b2) return {complete:false,valid:false,message:aiCapture.objectUrl?(aiCapture.warning||`請補正並確認（${confirmedCount}/6）`):"等待拍照"};
   const pTwo=handPoints([p1,p2]),bTwo=handPoints([b1,b2]);
   const natural=isNatural(pTwo,bTwo);
   const pShould=natural?false:playerNeedsThird(pTwo,bTwo);
@@ -197,7 +204,9 @@ function aiValidation(){
   const rulesOk=(pShould===!!p3)&&(bShould===!!b3);
   const pFinal=handPoints([p1,p2,p3]),bFinal=handPoints([b1,b2,b3]);
   const totalsOk=(aiCapture.expectedPlayerPoints===null||aiCapture.expectedPlayerPoints===pFinal)&&(aiCapture.expectedBankerPoints===null||aiCapture.expectedBankerPoints===bFinal);
-  return {complete:true,valid:rulesOk&&totalsOk,message:rulesOk&&totalsOk?"資料合理":"請人工確認此局"};
+  if(!rulesOk||!totalsOk) return {complete:true,valid:false,message:"牌面或補牌規則需修正"};
+  if(!allConfirmed) return {complete:true,valid:false,message:`請逐格人工確認（${confirmedCount}/6）`};
+  return {complete:true,valid:true,message:"資料合理，已人工確認"};
 }
 function chooseAiSlot(side,index){
   aiCapture.editing={side,index};
@@ -208,6 +217,7 @@ function setAiSlot(rank){
   const {side,index}=aiCapture.editing;
   cardState[side][index]=rank||null;
   if(aiCapture.autoSlots?.[side]) aiCapture.autoSlots[side][index]=false;
+  if(aiCapture.confirmed?.[side]) aiCapture.confirmed[side][index]=true;
   aiCapture.editing=null;
   aiCapture.expectedPlayerPoints=null; aiCapture.expectedBankerPoints=null;
   renderCardInput();updateRecordState();
@@ -215,7 +225,8 @@ function setAiSlot(rank){
 function renderAiEditor(){
   if(!aiCapture.editing)return "";
   const third=aiCapture.editing.index===2;
-  return `<section class="combined-card-input ai-rank-editor"><div class="combined-input-title">修改${aiCapture.editing.side==="player"?"閒":"莊"}${aiCapture.editing.index+1}張</div><div class="rank-grid">${RANKS.map(rank=>`<button type="button" class="rank-button" data-ai-rank="${rank}">${rank}</button>`).join("")}${third?'<button type="button" class="rank-button clear-rank" data-ai-rank="">清除</button>':""}</div></section>`;
+  const current=cardState[aiCapture.editing.side][aiCapture.editing.index];
+  return `<section class="combined-card-input ai-rank-editor"><div class="combined-input-title">確認或修改${aiCapture.editing.side==="player"?"閒":"莊"}${aiCapture.editing.index+1}張${current?`（目前 ${current}）`:""}</div><div class="rank-grid">${RANKS.map(rank=>`<button type="button" class="rank-button ${current===rank?"current-rank":""}" data-ai-rank="${rank}">${rank}</button>`).join("")}${third?'<button type="button" class="rank-button clear-rank" data-ai-rank="">確認無第三張</button>':""}</div></section>`;
 }
 function renderCardInput(){
   const aiMode=inputMethod==="ai";
@@ -876,6 +887,8 @@ async function analyzeCapturedPhoto(file){
     const cards=result.cards||{};
     cardState={player:[cards.player_1||null,cards.player_2||null,cards.player_3||null],banker:[cards.banker_1||null,cards.banker_2||null,cards.banker_3||null],active:"complete"};
     aiCapture.autoSlots={player:cardState.player.map(Boolean),banker:cardState.banker.map(Boolean)};
+    aiCapture.confirmed={player:[false,false,false],banker:[false,false,false]};
+    aiCapture.diagnostics=result.diagnostics||null;
     aiCapture.expectedPlayerPoints=Number.isInteger(result.player_points)?result.player_points:null;
     aiCapture.expectedBankerPoints=Number.isInteger(result.banker_points)?result.banker_points:null;
     aiCapture.warning=result.warning||"";
