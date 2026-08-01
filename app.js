@@ -17,6 +17,7 @@ let busy = false;
 let mode = "complete";
 let inputMethod = "manual";
 let aiCapture = freshAiCapture();
+let cameraStream = null;
 let venueOptions = [];
 let allShoes = [];
 let editingShoe = null;
@@ -63,7 +64,7 @@ function aiAllowed(){ return currentProfile?.role==="admin" || currentProfile?.a
 function releaseAiPhoto(){
   if(aiCapture.objectUrl) URL.revokeObjectURL(aiCapture.objectUrl);
   aiCapture=freshAiCapture();
-  const input=$("aiCameraInput"); if(input) input.value="";
+
 }
 function resetAiCapture(){ releaseAiPhoto(); }
 function setSync(text,type="pending"){
@@ -284,6 +285,7 @@ function setMode(next){
 }
 function setInputMethod(next,{preserve=false}={}){
   if(next==="ai"&&!aiAllowed())return;
+  if(next!=="ai")closeAiCamera();
   if(!preserve){cardState=freshCardState();resetAiCapture();}
   inputMethod=next;
   $("manualInputMethod").classList.toggle("active",next==="manual");
@@ -358,7 +360,7 @@ async function finishCurrentShoe(){
   if(busy||!currentShoe||currentShoe.status!=="open")return;
   if(!confirm(`確定完成 ${currentShoe.shoe_number}？完成後會鎖定，不能再新增牌局。`))return;
   setBusy(true);
-  try{const {data,error}=await supabase.rpc("finish_my_shoe",{p_shoe_id:currentShoe.id});if(error)throw error;currentShoe=data;currentGames=[];cardState=freshCardState();winnerOnlyState=freshWinnerOnlyState();resetAiCapture();$("gameNumberInput").value=1;setSync("已同步","ok");showSaveToast("✓ 牌靴已完成並鎖定");renderCardInput();updateWinnerOnlyUI();updateRecordState();render()}
+  try{const {data,error}=await supabase.rpc("finish_my_shoe",{p_shoe_id:currentShoe.id});if(error)throw error;currentShoe=data;currentGames=[];closeAiCamera();cardState=freshCardState();winnerOnlyState=freshWinnerOnlyState();resetAiCapture();$("gameNumberInput").value=1;setSync("已同步","ok");showSaveToast("✓ 牌靴已完成並鎖定");renderCardInput();updateWinnerOnlyUI();updateRecordState();render()}
   catch(e){showMessage(appMessage,e.message||"完成牌靴失敗","error")}
   finally{setBusy(false)}
 }
@@ -752,8 +754,64 @@ async function showAuthenticated(session){
     loginPanel.classList.remove("hidden");appPanel.classList.add("hidden");userArea.classList.add("hidden");
   }
 }
-function showLoggedOut(){stopRealtime();loginPanel.classList.remove("hidden");appPanel.classList.add("hidden");userArea.classList.add("hidden");currentUser=null;currentProfile=null;currentShoe=null;currentGames=[];setSync("準備中","pending")}
+function showLoggedOut(){closeAiCamera();stopRealtime();loginPanel.classList.remove("hidden");appPanel.classList.add("hidden");userArea.classList.add("hidden");currentUser=null;currentProfile=null;currentShoe=null;currentGames=[];setSync("準備中","pending")}
 
+
+
+async function openAiCamera(){
+  if(!aiAllowed()||inputMethod!=="ai"||busy)return;
+  const modal=$("cameraCaptureModal"),video=$("cameraVideo"),status=$("cameraStatus"),shutter=$("captureCameraButton");
+  modal.classList.remove("hidden");
+  status.textContent="正在啟動相機…";status.classList.remove("hidden");shutter.disabled=true;
+  try{
+    stopAiCameraStream();
+    cameraStream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1080}},audio:false
+    });
+    video.srcObject=cameraStream;
+    await video.play();
+    if(video.readyState<2)await new Promise(resolve=>video.addEventListener("loadeddata",resolve,{once:true}));
+    status.classList.add("hidden");shutter.disabled=false;
+  }catch(error){
+    console.error(error);status.textContent="無法開啟相機，請確認瀏覽器相機權限";shutter.disabled=true;
+  }
+}
+function stopAiCameraStream(){
+  if(cameraStream){cameraStream.getTracks().forEach(track=>track.stop());cameraStream=null;}
+  const video=$("cameraVideo");if(video)video.srcObject=null;
+}
+function closeAiCamera(){
+  stopAiCameraStream();
+  $("cameraCaptureModal")?.classList.add("hidden");
+}
+async function captureAiCameraFrame(){
+  const video=$("cameraVideo"),guide=$("cameraGuide"),shutter=$("captureCameraButton");
+  if(!cameraStream||!video.videoWidth||!video.videoHeight)return;
+  shutter.disabled=true;
+  try{
+    const vr=video.getBoundingClientRect(),gr=guide.getBoundingClientRect();
+    const scale=Math.max(vr.width/video.videoWidth,vr.height/video.videoHeight);
+    const displayedW=video.videoWidth*scale,displayedH=video.videoHeight*scale;
+    const offsetX=(displayedW-vr.width)/2,offsetY=(displayedH-vr.height)/2;
+    let sx=(gr.left-vr.left+offsetX)/scale;
+    let sy=(gr.top-vr.top+offsetY)/scale;
+    let sw=gr.width/scale,sh=gr.height/scale;
+    sx=Math.max(0,Math.min(video.videoWidth-1,sx));sy=Math.max(0,Math.min(video.videoHeight-1,sy));
+    sw=Math.max(1,Math.min(video.videoWidth-sx,sw));sh=Math.max(1,Math.min(video.videoHeight-sy,sh));
+    const canvas=document.createElement("canvas");
+    const maxWidth=1600,ratio=Math.min(1,maxWidth/sw);
+    canvas.width=Math.max(1,Math.round(sw*ratio));canvas.height=Math.max(1,Math.round(sh*ratio));
+    const ctx=canvas.getContext("2d",{alpha:false});ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
+    ctx.drawImage(video,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
+    const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error("拍照失敗")),"image/jpeg",.92));
+    const file=new File([blob],`capture-${Date.now()}.jpg`,{type:"image/jpeg"});
+    closeAiCamera();
+    await analyzeCapturedPhoto(file);
+  }catch(error){
+    console.error(error);showMessage(appMessage,error.message||"拍照失敗，請重新拍照","error");
+    shutter.disabled=false;
+  }
+}
 
 async function loadCaptureImage(file,maxWidth=1600){
   const bitmap=await createImageBitmap(file);
@@ -781,19 +839,19 @@ function cropCanvasDataUrl(source,box,quality=.9){
 }
 async function buildCaptureImages(file){
   const source=await loadCaptureImage(file);
-  /* 固定場館直式拍照模板：全圖 + 上方牌區 + 六個局部區。局部區稍微放寬，避免手機取景小幅偏移。 */
+  /* v16.4.5：相機取景框已只保留開牌區。以下比例直接切該框內的計分列與六個牌位。 */
   const boxes={
-    scoreboard:{x:.02,y:.02,w:.70,h:.18},
-    table:{x:.01,y:.04,w:.72,h:.48},
-    player_1:{x:.02,y:.11,w:.17,h:.23},
-    player_2:{x:.13,y:.11,w:.18,h:.23},
-    player_3:{x:.05,y:.27,w:.22,h:.22},
-    banker_1:{x:.28,y:.11,w:.18,h:.23},
-    banker_2:{x:.40,y:.11,w:.18,h:.23},
-    banker_3:{x:.33,y:.27,w:.23,h:.22}
+    scoreboard:{x:.00,y:.00,w:1.00,h:.27},
+    table:{x:.00,y:.08,w:1.00,h:.92},
+    player_1:{x:.015,y:.245,w:.225,h:.46},
+    player_2:{x:.225,y:.245,w:.225,h:.46},
+    player_3:{x:.095,y:.56,w:.31,h:.42},
+    banker_1:{x:.55,y:.245,w:.225,h:.46},
+    banker_2:{x:.76,y:.245,w:.225,h:.46},
+    banker_3:{x:.595,y:.56,w:.31,h:.42}
   };
-  const images={full:source.toDataURL("image/jpeg",.84)};
-  for(const [name,box] of Object.entries(boxes))images[name]=cropCanvasDataUrl(source,box);
+  const images={full:source.toDataURL("image/jpeg",.88)};
+  for(const [name,box] of Object.entries(boxes))images[name]=cropCanvasDataUrl(source,box,.93);
   source.width=1;source.height=1;
   return images;
 }
@@ -804,7 +862,7 @@ async function analyzeCapturedPhoto(file){
   try{
     const images=await buildCaptureImages(file);
     const {data:{session}}=await supabase.auth.getSession();if(!session)throw new Error("登入已失效");
-    const response=await fetch(AI_CAPTURE_FUNCTION_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:JSON.stringify({images,template:"fixed_dg_v1"})});
+    const response=await fetch(AI_CAPTURE_FUNCTION_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:JSON.stringify({images,template:"guided_opening_frame_v2"})});
     const result=await response.json().catch(()=>({}));if(!response.ok||result.ok===false)throw new Error(result.error||result.warning||`辨識服務錯誤（${response.status}）`);
     const cards=result.cards||{};
     cardState={player:[cards.player_1||null,cards.player_2||null,cards.player_3||null],banker:[cards.banker_1||null,cards.banker_2||null,cards.banker_3||null],active:"complete"};
@@ -874,8 +932,9 @@ $("modeComplete").onclick=()=>setMode("complete");
 $("modeWinnerOnly").onclick=()=>setMode("winner_only");
 $("manualInputMethod").onclick=()=>setInputMethod("manual");
 $("aiInputMethod").onclick=()=>setInputMethod("ai");
-$("aiCameraButton").onclick=()=>$("aiCameraInput").click();
-$("aiCameraInput").onchange=e=>{const file=e.target.files?.[0];if(file)analyzeCapturedPhoto(file)};
+$("aiCameraButton").onclick=openAiCamera;
+$("closeCameraButton").onclick=closeAiCamera;
+$("captureCameraButton").onclick=captureAiCameraFrame;
 $("nextRoundButton").onclick=saveAndNext;
 document.querySelectorAll(".winner-button").forEach(b=>b.onclick=()=>{winnerOnlyState.winner=b.dataset.winner;if(winnerOnlyState.winner!=="莊")winnerOnlyState.superSix=false;updateWinnerOnlyUI();updateRecordState()});
 $("winnerPlayerPair").onclick=()=>{winnerOnlyState.playerPair=!winnerOnlyState.playerPair;updateWinnerOnlyUI()};
