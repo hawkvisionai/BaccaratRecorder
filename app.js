@@ -206,8 +206,9 @@ function aiValidation(){
   const pFinal=handPoints([p1,p2,p3]),bFinal=handPoints([b1,b2,b3]);
   const totalsOk=(aiCapture.expectedPlayerPoints===null||aiCapture.expectedPlayerPoints===pFinal)&&(aiCapture.expectedBankerPoints===null||aiCapture.expectedBankerPoints===bFinal);
   if(!rulesOk||!totalsOk) return {complete:true,valid:false,message:"牌面或補牌規則需修正"};
-  if(aiCapture.reviewRequired&&!allConfirmed) return {complete:true,valid:false,message:`本局有疑問，請逐格確認（${confirmedCount}/6）`};
-  return {complete:true,valid:true,message:aiCapture.reviewRequired?"資料合理，已人工確認":"AI 辨識與規則驗證通過"};
+  // v16.5.5：只要牌面完整、補牌規則與畫面點數都一致，就直接允許儲存。
+  // 後端的低信心提示不再強制六格逐一確認；使用者仍可點任一牌位修改。
+  return {complete:true,valid:true,message:"AI 辨識與規則驗證通過"};
 }
 function chooseAiSlot(side,index){
   aiCapture.editing={side,index};
@@ -927,8 +928,17 @@ async function analyzeCapturedPhoto(file){
     aiCapture.expectedBankerPoints=Number.isInteger(result.banker_points)?result.banker_points:null;
     aiCapture.warning=result.warning||"";
     aiCapture.reviewRequired=result.review_required===true;
-    if(aiCapture.reviewRequired) showSaveToast("辨識完成，請補正有疑問的牌","warning");
-    else showSaveToast("✓ 辨識與規則驗證通過，可直接下一局");
+    // 最終是否需要人工處理，以前端確定性驗證為準：
+    // 起手牌完整、補牌規則正確、最終點數與畫面一致時，直接開放下一局。
+    const localCheck=aiValidation();
+    if(localCheck.complete&&localCheck.valid){
+      aiCapture.reviewRequired=false;
+      aiCapture.warning="";
+      showSaveToast("✓ 辨識與規則驗證通過，可直接下一局");
+    }else{
+      aiCapture.reviewRequired=true;
+      showSaveToast("辨識完成，請補正有疑問的牌","warning");
+    }
   }catch(e){
     console.error(e);cardState=freshCardState();showMessage(appMessage,e.message||"辨識失敗，請重新拍照","error");aiCapture.warning=e.message||"辨識失敗，請重新拍照";
   }finally{aiCapture.recognizing=false;setBusy(false);renderCardInput();updateRecordState();}
