@@ -839,7 +839,7 @@ function cropCanvasDataUrl(source,box,quality=.9){
 }
 async function buildCaptureImages(file){
   const source=await loadCaptureImage(file);
-  /* v16.4.5：相機取景框已只保留開牌區。以下比例直接切該框內的計分列與六個牌位。 */
+  /* v16.4.6：相機取景框已只保留開牌區。以下比例直接切該框內的計分列與六個牌位。 */
   const boxes={
     scoreboard:{x:.00,y:.00,w:1.00,h:.27},
     table:{x:.00,y:.08,w:1.00,h:.92},
