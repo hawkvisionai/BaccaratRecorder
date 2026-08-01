@@ -189,7 +189,7 @@ function activeInputLabel(active){
 }
 function aiValidation(){
   const [p1,p2,p3]=cardState.player,[b1,b2,b3]=cardState.banker;
-  if(!p1||!p2||!b1||!b2) return {complete:false,valid:false,message:aiCapture.objectUrl?"請人工確認此局":"等待拍照"};
+  if(!p1||!p2||!b1||!b2) return {complete:false,valid:false,message:aiCapture.objectUrl?(aiCapture.warning||"請人工確認此局"):"等待拍照"};
   const pTwo=handPoints([p1,p2]),bTwo=handPoints([b1,b2]);
   const natural=isNatural(pTwo,bTwo);
   const pShould=natural?false:playerNeedsThird(pTwo,bTwo);
@@ -821,15 +821,49 @@ async function fileToDataUrl(file){
     reader.readAsDataURL(file);
   });
 }
+
+async function dataUrlToImage(dataUrl){
+  return await new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>resolve(img);
+    img.onerror=()=>reject(new Error("照片解碼失敗"));
+    img.src=dataUrl;
+  });
+}
+
+async function buildRoiSheet(imageDataUrl){
+  const img=await dataUrlToImage(imageDataUrl);
+  const canvas=document.createElement("canvas");
+  canvas.width=960; canvas.height=720;
+  const ctx=canvas.getContext("2d",{alpha:false});
+  if(!ctx) throw new Error("無法建立辨識畫布");
+  ctx.fillStyle="#101722";ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle="#fff";ctx.font="bold 24px sans-serif";ctx.textAlign="center";
+  ctx.fillText("SCORE / HEADER",480,30);
+  const drawCrop=(label,x,y,w,h,dx,dy,dw,dh)=>{
+    ctx.fillStyle="#fff";ctx.font="bold 22px sans-serif";ctx.fillText(label,dx+dw/2,dy-8);
+    ctx.drawImage(img,x*img.width,y*img.height,w*img.width,h*img.height,dx,dy,dw,dh);
+    ctx.strokeStyle="#74d3ff";ctx.lineWidth=3;ctx.strokeRect(dx,dy,dw,dh);
+  };
+  drawCrop("HEADER",.04,.02,.92,.27,70,48,820,150);
+  const slots=[
+    ["P1",.10,.29,.20,.34,30,245],["P2",.29,.29,.20,.34,265,245],
+    ["B1",.51,.29,.20,.34,500,245],["B2",.70,.29,.20,.34,735,245],
+    ["P3",.18,.56,.25,.36,145,500],["B3",.57,.56,.25,.36,615,500]
+  ];
+  for(const [label,x,y,w,h,dx,dy] of slots) drawCrop(label,x,y,w,h,dx,dy,200,180);
+  return canvas.toDataURL("image/jpeg",.88);
+}
+
 async function analyzeCapturedPhoto(file){
   if(!file||!aiAllowed()||busy)return;
   resetAiCapture();aiCapture.file=file;aiCapture.objectUrl=URL.createObjectURL(file);aiCapture.recognizing=true;
   cardState=freshCardState();renderCardInput();updateRecordState();setBusy(true);
   try{
-    /* v16.4.8：iPhone Safari 不再建立六格 Canvas 合成圖；直接上傳取景框內的原始 JPEG。 */
     const image=await fileToDataUrl(file);
+    const roiSheet=await buildRoiSheet(image);
     const {data:{session}}=await supabase.auth.getSession();if(!session)throw new Error("登入已失效");
-    const response=await fetch(AI_CAPTURE_FUNCTION_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:JSON.stringify({image,template:"ddn_opening_area_v2"})});
+    const response=await fetch(AI_CAPTURE_FUNCTION_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:JSON.stringify({image,roi_sheet:roiSheet,template:"dreamgaming_roi_v1"})});
     const result=await response.json().catch(()=>({}));if(!response.ok||result.ok===false)throw new Error(result.error||result.warning||`辨識服務錯誤（${response.status}）`);
     const cards=result.cards||{};
     cardState={player:[cards.player_1||null,cards.player_2||null,cards.player_3||null],banker:[cards.banker_1||null,cards.banker_2||null,cards.banker_3||null],active:"complete"};
@@ -837,11 +871,13 @@ async function analyzeCapturedPhoto(file){
     aiCapture.expectedPlayerPoints=Number.isInteger(result.player_points)?result.player_points:null;
     aiCapture.expectedBankerPoints=Number.isInteger(result.banker_points)?result.banker_points:null;
     aiCapture.warning=result.warning||"";
-    showSaveToast("✓ 辨識完成，請人工核對");
+    if(result.review_required) showSaveToast("辨識完成，請補正有疑問的牌","warning");
+    else showSaveToast("✓ 辨識完成，請人工核對");
   }catch(e){
     console.error(e);cardState=freshCardState();showMessage(appMessage,e.message||"辨識失敗，請重新拍照","error");aiCapture.warning=e.message||"辨識失敗，請重新拍照";
   }finally{aiCapture.recognizing=false;setBusy(false);renderCardInput();updateRecordState();}
 }
+
 async function callUserAdmin(action,payload={}){
   const {data:{session}}=await supabase.auth.getSession();
   if(!session) throw new Error("登入已失效，請重新登入");
