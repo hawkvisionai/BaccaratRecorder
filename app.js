@@ -852,7 +852,11 @@ async function buildRoiSheet(imageDataUrl){
     ["P3",.18,.56,.25,.36,145,500],["B3",.57,.56,.25,.36,615,500]
   ];
   for(const [label,x,y,w,h,dx,dy] of slots) drawCrop(label,x,y,w,h,dx,dy,200,180);
-  return canvas.toDataURL("image/jpeg",.88);
+  const dataUrl=canvas.toDataURL("image/jpeg",.86);
+  if(typeof dataUrl!=="string" || !dataUrl.startsWith("data:image/") || dataUrl.length<2000){
+    throw new Error("六格辨識圖建立失敗");
+  }
+  return dataUrl;
 }
 
 async function analyzeCapturedPhoto(file){
@@ -861,9 +865,13 @@ async function analyzeCapturedPhoto(file){
   cardState=freshCardState();renderCardInput();updateRecordState();setBusy(true);
   try{
     const image=await fileToDataUrl(file);
-    const roiSheet=await buildRoiSheet(image);
+    let roiSheet=null;
+    try{ roiSheet=await buildRoiSheet(image); }
+    catch(roiError){ console.warn("ROI sheet fallback",roiError); }
     const {data:{session}}=await supabase.auth.getSession();if(!session)throw new Error("登入已失效");
-    const response=await fetch(AI_CAPTURE_FUNCTION_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:JSON.stringify({image,roi_sheet:roiSheet,template:"dreamgaming_roi_v1"})});
+    const payload={image,template:"dreamgaming_roi_v2"};
+    if(typeof roiSheet==="string"&&roiSheet.startsWith("data:image/")) payload.roi_sheet=roiSheet;
+    const response=await fetch(AI_CAPTURE_FUNCTION_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:JSON.stringify(payload)});
     const result=await response.json().catch(()=>({}));if(!response.ok||result.ok===false)throw new Error(result.error||result.warning||`辨識服務錯誤（${response.status}）`);
     const cards=result.cards||{};
     cardState={player:[cards.player_1||null,cards.player_2||null,cards.player_3||null],banker:[cards.banker_1||null,cards.banker_2||null,cards.banker_3||null],active:"complete"};
