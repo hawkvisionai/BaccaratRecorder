@@ -180,3 +180,16 @@ button:disabled{opacity:.45;cursor:not-allowed}
   .baccarat-table-layout.ai-table .table-card{width:40px;min-height:47px;font-size:18px}
   .baccarat-table-layout.ai-table .third-card-placeholder{width:40px;height:47px}
 }
+
+
+/* v16.4.3：精簡 AI 拍照流程與人工核對標記 */
+.camera-button{min-height:46px;font-size:17px;padding:10px 16px}
+.table-card.ai-recognized{
+  background:rgba(34,197,94,.18);
+  border-color:#22c55e;
+  box-shadow:0 0 0 2px rgba(34,197,94,.08),0 0 14px rgba(34,197,94,.16);
+}
+.table-card.ai-recognized:hover{background:rgba(34,197,94,.24)}
+@media(max-width:620px){
+  .camera-button{min-height:48px;font-size:16px}
+}

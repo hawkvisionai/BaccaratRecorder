@@ -53,7 +53,11 @@ function freshWinnerOnlyState(){
   return { winner:null, playerPair:false, bankerPair:false, superSix:false };
 }
 function freshAiCapture(){
-  return { file:null, objectUrl:null, editing:null, recognizing:false, warning:"", expectedPlayerPoints:null, expectedBankerPoints:null };
+  return {
+    file:null, objectUrl:null, editing:null, recognizing:false, warning:"",
+    expectedPlayerPoints:null, expectedBankerPoints:null,
+    autoSlots:{player:[false,false,false],banker:[false,false,false]}
+  };
 }
 function aiAllowed(){ return currentProfile?.role==="admin" || currentProfile?.ai_capture_enabled===true; }
 function releaseAiPhoto(){
@@ -169,7 +173,10 @@ function handDisplay(side,label){
   const initialReady=!!cards[0]&&!!cards[1];
   const point=initialReady?handPoints(cards):null;
   const aiMode=inputMethod==="ai";
-  const cardButton=(rank,index)=>`<button type="button" class="table-card ${rank?"filled":"empty"} ${aiMode?"editable-slot":""}" data-edit-side="${side}" data-edit-index="${index}" ${!aiMode&&!rank?"disabled":""}>${rank||(aiMode?"－":"·")}</button>`;
+  const cardButton=(rank,index)=>{
+    const autoRecognized=aiMode&&rank&&aiCapture.autoSlots?.[side]?.[index];
+    return `<button type="button" class="table-card ${rank?"filled":"empty"} ${aiMode?"editable-slot":""} ${autoRecognized?"ai-recognized":""}" data-edit-side="${side}" data-edit-index="${index}" ${!aiMode&&!rank?"disabled":""}>${rank||(aiMode?"－":"·")}</button>`;
+  };
   return `<div class="table-hand ${side}">
     <div class="table-hand-head"><strong>${label}</strong>${initialReady?`<span class="initial-points">＋${point}</span>`:""}</div>
     <div class="initial-cards">${cardButton(cards[0],0)}${cardButton(cards[1],1)}</div>
@@ -199,6 +206,7 @@ function setAiSlot(rank){
   if(!aiCapture.editing)return;
   const {side,index}=aiCapture.editing;
   cardState[side][index]=rank||null;
+  if(aiCapture.autoSlots?.[side]) aiCapture.autoSlots[side][index]=false;
   aiCapture.editing=null;
   aiCapture.expectedPlayerPoints=null; aiCapture.expectedBankerPoints=null;
   renderCardInput();updateRecordState();
@@ -350,7 +358,7 @@ async function finishCurrentShoe(){
   if(busy||!currentShoe||currentShoe.status!=="open")return;
   if(!confirm(`確定完成 ${currentShoe.shoe_number}？完成後會鎖定，不能再新增牌局。`))return;
   setBusy(true);
-  try{const {data,error}=await supabase.rpc("finish_my_shoe",{p_shoe_id:currentShoe.id});if(error)throw error;currentShoe=data;setSync("已同步","ok");showSaveToast("✓ 牌靴已完成並鎖定");render()}
+  try{const {data,error}=await supabase.rpc("finish_my_shoe",{p_shoe_id:currentShoe.id});if(error)throw error;currentShoe=data;cardState=freshCardState();resetAiCapture();setSync("已同步","ok");showSaveToast("✓ 牌靴已完成並鎖定");renderCardInput();render()}
   catch(e){showMessage(appMessage,e.message||"完成牌靴失敗","error")}
   finally{setBusy(false)}
 }
@@ -765,6 +773,10 @@ async function analyzeCapturedPhoto(file){
     const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||`辨識服務錯誤（${response.status}）`);
     const cards=result.cards||{};
     cardState={player:[cards.player_1||null,cards.player_2||null,cards.player_3||null],banker:[cards.banker_1||null,cards.banker_2||null,cards.banker_3||null],active:"complete"};
+    aiCapture.autoSlots={
+      player:cardState.player.map(Boolean),
+      banker:cardState.banker.map(Boolean)
+    };
     aiCapture.expectedPlayerPoints=Number.isInteger(result.player_points)?result.player_points:null;
     aiCapture.expectedBankerPoints=Number.isInteger(result.banker_points)?result.banker_points:null;
     aiCapture.warning=result.warning||"";
