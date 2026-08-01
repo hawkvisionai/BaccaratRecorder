@@ -60,7 +60,7 @@ function freshAiCapture(){
     expectedPlayerPoints:null, expectedBankerPoints:null,
     autoSlots:{player:[false,false,false],banker:[false,false,false]},
     confirmed:{player:[false,false,false],banker:[false,false,false]},
-    diagnostics:null
+    diagnostics:null, reviewRequired:false
   };
 }
 function aiAllowed(){ return currentProfile?.role==="admin" || currentProfile?.ai_capture_enabled===true; }
@@ -180,8 +180,8 @@ function handDisplay(side,label){
   const cardButton=(rank,index)=>{
     const autoRecognized=aiMode&&rank&&aiCapture.autoSlots?.[side]?.[index];
     const confirmed=aiMode&&aiCapture.confirmed?.[side]?.[index]===true;
-    const needsConfirm=aiMode&&!!aiCapture.objectUrl&&!confirmed;
-    const title=aiMode?(confirmed?"已人工確認":"點此確認或修改"):"";
+    const needsConfirm=aiMode&&!!aiCapture.objectUrl&&aiCapture.reviewRequired&&!confirmed;
+    const title=aiMode?(confirmed?"已人工確認":aiCapture.reviewRequired?"點此確認或修改":"AI 已驗證，可點擊修改"):"";
     return `<button type="button" title="${title}" class="table-card ${rank?"filled":"empty"} ${aiMode?"editable-slot":""} ${autoRecognized?"ai-recognized":""} ${needsConfirm?"ai-unconfirmed":""} ${confirmed?"ai-confirmed":""}" data-edit-side="${side}" data-edit-index="${index}" ${!aiMode&&!rank?"disabled":""}>${rank||(aiMode?"－":"·")}</button>`;
   };
   return `<div class="table-hand ${side}">
@@ -206,8 +206,8 @@ function aiValidation(){
   const pFinal=handPoints([p1,p2,p3]),bFinal=handPoints([b1,b2,b3]);
   const totalsOk=(aiCapture.expectedPlayerPoints===null||aiCapture.expectedPlayerPoints===pFinal)&&(aiCapture.expectedBankerPoints===null||aiCapture.expectedBankerPoints===bFinal);
   if(!rulesOk||!totalsOk) return {complete:true,valid:false,message:"牌面或補牌規則需修正"};
-  if(!allConfirmed) return {complete:true,valid:false,message:`請逐格人工確認（${confirmedCount}/6）`};
-  return {complete:true,valid:true,message:"資料合理，已人工確認"};
+  if(aiCapture.reviewRequired&&!allConfirmed) return {complete:true,valid:false,message:`本局有疑問，請逐格確認（${confirmedCount}/6）`};
+  return {complete:true,valid:true,message:aiCapture.reviewRequired?"資料合理，已人工確認":"AI 辨識與規則驗證通過"};
 }
 function chooseAiSlot(side,index){
   aiCapture.editing={side,index};
@@ -797,7 +797,18 @@ async function openAiCamera(){
       }
     }catch(constraintError){console.warn("camera enhancement fallback",constraintError);}
     const previous=$("cameraPreviousResult");
-    if(previous){previous.textContent=lastSavedCameraResult;previous.classList.toggle("hidden",!lastSavedCameraResult);}
+    if(previous){
+      clearTimeout(previous._timer);
+      previous.textContent=lastSavedCameraResult;
+      previous.classList.toggle("hidden",!lastSavedCameraResult);
+      if(lastSavedCameraResult){
+        previous._timer=setTimeout(()=>{
+          previous.classList.add("hidden");
+          previous.textContent="";
+          lastSavedCameraResult="";
+        },3000);
+      }
+    }
     status.classList.add("hidden");shutter.disabled=false;
   }catch(error){
     console.error(error);status.textContent="無法開啟相機，請確認瀏覽器相機權限";shutter.disabled=true;
@@ -915,8 +926,9 @@ async function analyzeCapturedPhoto(file){
     aiCapture.expectedPlayerPoints=Number.isInteger(result.player_points)?result.player_points:null;
     aiCapture.expectedBankerPoints=Number.isInteger(result.banker_points)?result.banker_points:null;
     aiCapture.warning=result.warning||"";
-    if(result.review_required) showSaveToast("辨識完成，請補正有疑問的牌","warning");
-    else showSaveToast("✓ 辨識完成，請人工核對");
+    aiCapture.reviewRequired=result.review_required===true;
+    if(aiCapture.reviewRequired) showSaveToast("辨識完成，請補正有疑問的牌","warning");
+    else showSaveToast("✓ 辨識與規則驗證通過，可直接下一局");
   }catch(e){
     console.error(e);cardState=freshCardState();showMessage(appMessage,e.message||"辨識失敗，請重新拍照","error");aiCapture.warning=e.message||"辨識失敗，請重新拍照";
   }finally{aiCapture.recognizing=false;setBusy(false);renderCardInput();updateRecordState();}
