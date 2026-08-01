@@ -813,60 +813,23 @@ async function captureAiCameraFrame(){
   }
 }
 
-async function loadCaptureImage(file,maxWidth=1200){
-  const bitmap=await createImageBitmap(file);
-  const scale=Math.min(1,maxWidth/bitmap.width);
-  const canvas=document.createElement("canvas");
-  canvas.width=Math.max(1,Math.round(bitmap.width*scale));
-  canvas.height=Math.max(1,Math.round(bitmap.height*scale));
-  const ctx=canvas.getContext("2d",{alpha:false});
-  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
-  ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);
-  bitmap.close?.();
-  return canvas;
-}
-function cropToCanvas(source,box,width,height){
-  const sx=Math.max(0,Math.round(source.width*box.x));
-  const sy=Math.max(0,Math.round(source.height*box.y));
-  const sw=Math.max(1,Math.min(source.width-sx,Math.round(source.width*box.w)));
-  const sh=Math.max(1,Math.min(source.height-sy,Math.round(source.height*box.h)));
-  const canvas=document.createElement("canvas");canvas.width=width;canvas.height=height;
-  const ctx=canvas.getContext("2d",{alpha:false});ctx.fillStyle="#101827";ctx.fillRect(0,0,width,height);
-  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
-  const scale=Math.min(width/sw,height/sh),dw=sw*scale,dh=sh*scale;
-  ctx.drawImage(source,sx,sy,sw,sh,(width-dw)/2,(height-dh)/2,dw,dh);
-  return canvas;
-}
-async function buildCaptureSheet(file){
-  const source=await loadCaptureImage(file,1200);
-  /* v16.4.7：一次建立固定六格辨識合成圖，只上傳一張圖，降低傳輸量與模型往返時間。 */
-  const boxes={
-    player_1:{x:.01,y:.23,w:.235,h:.47}, player_2:{x:.215,y:.23,w:.235,h:.47}, player_3:{x:.075,y:.53,w:.35,h:.46},
-    banker_1:{x:.545,y:.23,w:.235,h:.47}, banker_2:{x:.75,y:.23,w:.235,h:.47}, banker_3:{x:.575,y:.53,w:.35,h:.46}
-  };
-  const sheet=document.createElement("canvas");sheet.width=1200;sheet.height=1040;
-  const ctx=sheet.getContext("2d",{alpha:false});ctx.fillStyle="#0b1220";ctx.fillRect(0,0,sheet.width,sheet.height);
-  ctx.fillStyle="#fff";ctx.font="bold 30px sans-serif";ctx.textAlign="left";ctx.fillText("ORIGINAL OPENING AREA",28,38);
-  const overview=cropToCanvas(source,{x:0,y:0,w:1,h:1},1144,330);ctx.drawImage(overview,28,54);
-  const order=[["player_1","PLAYER 1"],["player_2","PLAYER 2"],["player_3","PLAYER 3"],["banker_1","BANKER 1"],["banker_2","BANKER 2"],["banker_3","BANKER 3"]];
-  const cellW=360,cellH=280,gap=30,startX=30,startY=420;
-  order.forEach(([key,label],i)=>{
-    const col=i%3,row=Math.floor(i/3),x=startX+col*(cellW+gap),y=startY+row*(cellH+55);
-    ctx.fillStyle="#fff";ctx.font="bold 27px sans-serif";ctx.fillText(label,x,y-10);
-    ctx.strokeStyle="#7aa2ff";ctx.lineWidth=4;ctx.strokeRect(x,y,cellW,cellH);
-    const crop=cropToCanvas(source,boxes[key],cellW,cellH);ctx.drawImage(crop,x,y);
+async function fileToDataUrl(file){
+  return await new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>typeof reader.result==="string"?resolve(reader.result):reject(new Error("照片讀取失敗"));
+    reader.onerror=()=>reject(new Error("照片讀取失敗"));
+    reader.readAsDataURL(file);
   });
-  source.width=1;source.height=1;
-  return sheet.toDataURL("image/jpeg",.76);
 }
 async function analyzeCapturedPhoto(file){
   if(!file||!aiAllowed()||busy)return;
   resetAiCapture();aiCapture.file=file;aiCapture.objectUrl=URL.createObjectURL(file);aiCapture.recognizing=true;
   cardState=freshCardState();renderCardInput();updateRecordState();setBusy(true);
   try{
-    const image=await buildCaptureSheet(file);
+    /* v16.4.8：iPhone Safari 不再建立六格 Canvas 合成圖；直接上傳取景框內的原始 JPEG。 */
+    const image=await fileToDataUrl(file);
     const {data:{session}}=await supabase.auth.getSession();if(!session)throw new Error("登入已失效");
-    const response=await fetch(AI_CAPTURE_FUNCTION_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:JSON.stringify({image,template:"fixed_six_slot_sheet_v1"})});
+    const response=await fetch(AI_CAPTURE_FUNCTION_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:JSON.stringify({image,template:"ddn_opening_area_v2"})});
     const result=await response.json().catch(()=>({}));if(!response.ok||result.ok===false)throw new Error(result.error||result.warning||`辨識服務錯誤（${response.status}）`);
     const cards=result.cards||{};
     cardState={player:[cards.player_1||null,cards.player_2||null,cards.player_3||null],banker:[cards.banker_1||null,cards.banker_2||null,cards.banker_3||null],active:"complete"};
