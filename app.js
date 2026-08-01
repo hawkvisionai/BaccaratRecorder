@@ -358,7 +358,7 @@ async function finishCurrentShoe(){
   if(busy||!currentShoe||currentShoe.status!=="open")return;
   if(!confirm(`確定完成 ${currentShoe.shoe_number}？完成後會鎖定，不能再新增牌局。`))return;
   setBusy(true);
-  try{const {data,error}=await supabase.rpc("finish_my_shoe",{p_shoe_id:currentShoe.id});if(error)throw error;currentShoe=data;cardState=freshCardState();resetAiCapture();setSync("已同步","ok");showSaveToast("✓ 牌靴已完成並鎖定");renderCardInput();render()}
+  try{const {data,error}=await supabase.rpc("finish_my_shoe",{p_shoe_id:currentShoe.id});if(error)throw error;currentShoe=data;currentGames=[];cardState=freshCardState();winnerOnlyState=freshWinnerOnlyState();resetAiCapture();$("gameNumberInput").value=1;setSync("已同步","ok");showSaveToast("✓ 牌靴已完成並鎖定");renderCardInput();updateWinnerOnlyUI();updateRecordState();render()}
   catch(e){showMessage(appMessage,e.message||"完成牌靴失敗","error")}
   finally{setBusy(false)}
 }
@@ -755,34 +755,69 @@ async function showAuthenticated(session){
 function showLoggedOut(){stopRealtime();loginPanel.classList.remove("hidden");appPanel.classList.add("hidden");userArea.classList.add("hidden");currentUser=null;currentProfile=null;currentShoe=null;currentGames=[];setSync("準備中","pending")}
 
 
-async function fileToDataUrl(file,maxWidth=1280,quality=.82){
+async function loadCaptureImage(file,maxWidth=1600){
   const bitmap=await createImageBitmap(file);
   const scale=Math.min(1,maxWidth/bitmap.width);
-  const canvas=document.createElement("canvas");canvas.width=Math.round(bitmap.width*scale);canvas.height=Math.round(bitmap.height*scale);
-  canvas.getContext("2d").drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();
+  const canvas=document.createElement("canvas");
+  canvas.width=Math.max(1,Math.round(bitmap.width*scale));
+  canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+  canvas.getContext("2d",{alpha:false}).drawImage(bitmap,0,0,canvas.width,canvas.height);
+  bitmap.close?.();
+  return canvas;
+}
+function cropCanvasDataUrl(source,box,quality=.9){
+  const sx=Math.max(0,Math.round(source.width*box.x));
+  const sy=Math.max(0,Math.round(source.height*box.y));
+  const sw=Math.max(1,Math.min(source.width-sx,Math.round(source.width*box.w)));
+  const sh=Math.max(1,Math.min(source.height-sy,Math.round(source.height*box.h)));
+  const canvas=document.createElement("canvas");
+  const boost=Math.min(2.4,900/Math.max(sw,sh));
+  canvas.width=Math.max(220,Math.round(sw*boost));
+  canvas.height=Math.max(220,Math.round(sh*boost));
+  const ctx=canvas.getContext("2d",{alpha:false});
+  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
+  ctx.drawImage(source,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
   return canvas.toDataURL("image/jpeg",quality);
+}
+async function buildCaptureImages(file){
+  const source=await loadCaptureImage(file);
+  /* 固定場館直式拍照模板：全圖 + 上方牌區 + 六個局部區。局部區稍微放寬，避免手機取景小幅偏移。 */
+  const boxes={
+    scoreboard:{x:.02,y:.02,w:.70,h:.18},
+    table:{x:.01,y:.04,w:.72,h:.48},
+    player_1:{x:.02,y:.11,w:.17,h:.23},
+    player_2:{x:.13,y:.11,w:.18,h:.23},
+    player_3:{x:.05,y:.27,w:.22,h:.22},
+    banker_1:{x:.28,y:.11,w:.18,h:.23},
+    banker_2:{x:.40,y:.11,w:.18,h:.23},
+    banker_3:{x:.33,y:.27,w:.23,h:.22}
+  };
+  const images={full:source.toDataURL("image/jpeg",.84)};
+  for(const [name,box] of Object.entries(boxes))images[name]=cropCanvasDataUrl(source,box);
+  source.width=1;source.height=1;
+  return images;
 }
 async function analyzeCapturedPhoto(file){
   if(!file||!aiAllowed()||busy)return;
   resetAiCapture();aiCapture.file=file;aiCapture.objectUrl=URL.createObjectURL(file);aiCapture.recognizing=true;
-  renderCardInput();updateRecordState();setBusy(true);
+  cardState=freshCardState();renderCardInput();updateRecordState();setBusy(true);
   try{
-    const image=await fileToDataUrl(file);
+    const images=await buildCaptureImages(file);
     const {data:{session}}=await supabase.auth.getSession();if(!session)throw new Error("登入已失效");
-    const response=await fetch(AI_CAPTURE_FUNCTION_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:JSON.stringify({image})});
-    const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||`辨識服務錯誤（${response.status}）`);
+    const response=await fetch(AI_CAPTURE_FUNCTION_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:JSON.stringify({images,template:"fixed_dg_v1"})});
+    const result=await response.json().catch(()=>({}));if(!response.ok||result.ok===false)throw new Error(result.error||result.warning||`辨識服務錯誤（${response.status}）`);
     const cards=result.cards||{};
     cardState={player:[cards.player_1||null,cards.player_2||null,cards.player_3||null],banker:[cards.banker_1||null,cards.banker_2||null,cards.banker_3||null],active:"complete"};
-    aiCapture.autoSlots={
-      player:cardState.player.map(Boolean),
-      banker:cardState.banker.map(Boolean)
-    };
+    aiCapture.autoSlots={player:cardState.player.map(Boolean),banker:cardState.banker.map(Boolean)};
     aiCapture.expectedPlayerPoints=Number.isInteger(result.player_points)?result.player_points:null;
     aiCapture.expectedBankerPoints=Number.isInteger(result.banker_points)?result.banker_points:null;
     aiCapture.warning=result.warning||"";
     showSaveToast("✓ 辨識完成，請人工核對");
-  }catch(e){console.error(e);showMessage(appMessage,e.message||"照片辨識失敗","error");aiCapture.warning=e.message||"辨識失敗";}
-  finally{aiCapture.recognizing=false;setBusy(false);renderCardInput();updateRecordState();}
+  }catch(e){
+    console.error(e);cardState=freshCardState();
+    showMessage(appMessage,e.message||"辨識失敗，請重新拍照","error");
+    aiCapture.warning=e.message||"辨識失敗，請重新拍照";
+  }finally{aiCapture.recognizing=false;setBusy(false);renderCardInput();updateRecordState();}
 }
 async function callUserAdmin(action,payload={}){
   const {data:{session}}=await supabase.auth.getSession();
