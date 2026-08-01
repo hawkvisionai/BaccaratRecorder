@@ -18,6 +18,7 @@ let mode = "complete";
 let inputMethod = "manual";
 let aiCapture = freshAiCapture();
 let cameraStream = null;
+let lastSavedCameraResult = "";
 let venueOptions = [];
 let allShoes = [];
 let editingShoe = null;
@@ -396,7 +397,11 @@ async function saveAndNext(){
   setBusy(true);
   try{
     setSync("同步中");const {data,error}=await supabase.from("games").insert(game).select().single();if(error)throw error;
-    currentGames.push(data);setSync("已同步","ok");showSaveToast(`✓ 第 ${gameNumber} 局已儲存`);resetRound();$("gameNumberInput").value=gameNumber+1;render();
+    currentGames.push(data);setSync("已同步","ok");
+    const savedSummary=mode==="complete"?`✓ 第 ${gameNumber} 局已成功儲存｜閒 ${game.player_points} 點・莊 ${game.banker_points} 點・${game.winner}贏`:`✓ 第 ${gameNumber} 局已成功儲存｜${game.winner}`;
+    lastSavedCameraResult=savedSummary;showSaveToast(`✓ 第 ${gameNumber} 局已儲存`);
+    resetRound();$("gameNumberInput").value=gameNumber+1;render();
+    if(inputMethod==="ai"&&mode==="complete") setTimeout(()=>openAiCamera(),180);
   }catch(e){console.error(e);setSync("同步失敗","error");showSaveToast("儲存失敗","error");showMessage(appMessage,e.message||"儲存失敗","error")}
   finally{setBusy(false);render()}
 }
@@ -777,11 +782,22 @@ async function openAiCamera(){
   try{
     stopAiCameraStream();
     cameraStream=await navigator.mediaDevices.getUserMedia({
-      video:{facingMode:{ideal:"environment"},width:{ideal:1920},height:{ideal:1080}},audio:false
+      video:{facingMode:{ideal:"environment"},width:{ideal:3840,min:1920},height:{ideal:2160,min:1080}},audio:false
     });
     video.srcObject=cameraStream;
     await video.play();
     if(video.readyState<2)await new Promise(resolve=>video.addEventListener("loadeddata",resolve,{once:true}));
+    const track=cameraStream.getVideoTracks()[0];
+    try{
+      const caps=track?.getCapabilities?.()||{};
+      if(caps.focusMode?.includes?.("continuous")) await track.applyConstraints({advanced:[{focusMode:"continuous"}]});
+      if(caps.zoom){
+        const target=Math.min(caps.zoom.max||1.5,Math.max(caps.zoom.min||1,1.35));
+        await track.applyConstraints({advanced:[{zoom:target}]});
+      }
+    }catch(constraintError){console.warn("camera enhancement fallback",constraintError);}
+    const previous=$("cameraPreviousResult");
+    if(previous){previous.textContent=lastSavedCameraResult;previous.classList.toggle("hidden",!lastSavedCameraResult);}
     status.classList.add("hidden");shutter.disabled=false;
   }catch(error){
     console.error(error);status.textContent="無法開啟相機，請確認瀏覽器相機權限";shutter.disabled=true;
@@ -810,11 +826,13 @@ async function captureAiCameraFrame(){
     sx=Math.max(0,Math.min(video.videoWidth-1,sx));sy=Math.max(0,Math.min(video.videoHeight-1,sy));
     sw=Math.max(1,Math.min(video.videoWidth-sx,sw));sh=Math.max(1,Math.min(video.videoHeight-sy,sh));
     const canvas=document.createElement("canvas");
-    const maxWidth=1600,ratio=Math.min(1,maxWidth/sw);
+    const maxWidth=2400,ratio=Math.min(1,maxWidth/sw);
     canvas.width=Math.max(1,Math.round(sw*ratio));canvas.height=Math.max(1,Math.round(sh*ratio));
     const ctx=canvas.getContext("2d",{alpha:false});ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";
+    ctx.filter="contrast(1.12) saturate(1.05)";
     ctx.drawImage(video,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
-    const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error("拍照失敗")),"image/jpeg",.92));
+    ctx.filter="none";
+    const blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error("拍照失敗")),"image/jpeg",.95));
     const file=new File([blob],`capture-${Date.now()}.jpg`,{type:"image/jpeg"});
     closeAiCamera();
     await analyzeCapturedPhoto(file);
@@ -845,28 +863,33 @@ async function dataUrlToImage(dataUrl){
 async function buildRoiSheet(imageDataUrl){
   const img=await dataUrlToImage(imageDataUrl);
   const canvas=document.createElement("canvas");
-  canvas.width=960; canvas.height=720;
+  canvas.width=1280; canvas.height=980;
   const ctx=canvas.getContext("2d",{alpha:false});
   if(!ctx) throw new Error("無法建立辨識畫布");
   ctx.fillStyle="#101722";ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle="#fff";ctx.font="bold 24px sans-serif";ctx.textAlign="center";
-  ctx.fillText("SCORE / HEADER",480,30);
-  const drawCrop=(label,x,y,w,h,dx,dy,dw,dh)=>{
-    ctx.fillStyle="#fff";ctx.font="bold 22px sans-serif";ctx.fillText(label,dx+dw/2,dy-8);
-    ctx.drawImage(img,x*img.width,y*img.height,w*img.width,h*img.height,dx,dy,dw,dh);
+  const drawLabel=(label,cx,y)=>{ctx.fillStyle="#fff";ctx.font="bold 24px sans-serif";ctx.textAlign="center";ctx.fillText(label,cx,y);};
+  const crop=(x,y,w,h)=>({sx:x*img.width,sy:y*img.height,sw:w*img.width,sh:h*img.height});
+  const drawCrop=(label,x,y,w,h,dx,dy,dw,dh,{rotate=false}={})=>{
+    drawLabel(label,dx+dw/2,dy-10);
+    const c=crop(x,y,w,h);
+    ctx.save();ctx.beginPath();ctx.rect(dx,dy,dw,dh);ctx.clip();
+    ctx.filter="contrast(1.18) saturate(1.05)";
+    if(rotate){
+      ctx.translate(dx+dw/2,dy+dh/2);ctx.rotate(-Math.PI/2);
+      ctx.drawImage(img,c.sx,c.sy,c.sw,c.sh,-dh/2,-dw/2,dh,dw);
+    }else ctx.drawImage(img,c.sx,c.sy,c.sw,c.sh,dx,dy,dw,dh);
+    ctx.filter="none";ctx.restore();
     ctx.strokeStyle="#74d3ff";ctx.lineWidth=3;ctx.strokeRect(dx,dy,dw,dh);
   };
-  drawCrop("HEADER",.04,.02,.92,.27,70,48,820,150);
-  const slots=[
-    ["P1",.10,.29,.20,.34,30,245],["P2",.29,.29,.20,.34,265,245],
-    ["B1",.51,.29,.20,.34,500,245],["B2",.70,.29,.20,.34,735,245],
-    ["P3",.18,.56,.25,.36,145,500],["B3",.57,.56,.25,.36,615,500]
-  ];
-  for(const [label,x,y,w,h,dx,dy] of slots) drawCrop(label,x,y,w,h,dx,dy,200,180);
-  const dataUrl=canvas.toDataURL("image/jpeg",.86);
-  if(typeof dataUrl!=="string" || !dataUrl.startsWith("data:image/") || dataUrl.length<2000){
-    throw new Error("六格辨識圖建立失敗");
-  }
+  drawCrop("SCORE / HEADER",.03,.01,.94,.25,80,48,1120,185);
+  drawCrop("P1",.08,.25,.22,.38,30,300,270,250);
+  drawCrop("P2",.27,.25,.22,.38,330,300,270,250);
+  drawCrop("B1",.50,.25,.22,.38,680,300,270,250);
+  drawCrop("B2",.69,.25,.22,.38,980,300,270,250);
+  drawCrop("P3 ROTATED",.15,.52,.31,.42,120,650,400,260,{rotate:true});
+  drawCrop("B3 ROTATED",.54,.52,.31,.42,760,650,400,260,{rotate:true});
+  const dataUrl=canvas.toDataURL("image/jpeg",.91);
+  if(typeof dataUrl!=="string" || !dataUrl.startsWith("data:image/") || dataUrl.length<2000) throw new Error("六格辨識圖建立失敗");
   return dataUrl;
 }
 

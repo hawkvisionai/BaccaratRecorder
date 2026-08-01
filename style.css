@@ -230,3 +230,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
   box-shadow:0 0 0 2px rgba(34,197,94,.10),0 0 14px rgba(34,197,94,.18)!important;
 }
 .rank-button.current-rank{outline:3px solid #22c55e;outline-offset:2px}
+
+
+/* v16.5.3：遠距拍攝、橫向補牌與連續拍照流程 */
+.camera-guide{left:7%;width:86%;top:18%;aspect-ratio:1.78/1}
+.camera-previous-result{position:absolute;z-index:3;left:50%;top:max(18px,env(safe-area-inset-top));transform:translateX(-50%);width:min(92%,760px);padding:10px 14px;border-radius:12px;background:rgba(22,101,52,.92);border:1px solid rgba(134,239,172,.8);color:#fff;font-size:14px;font-weight:900;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+.camera-previous-result.hidden{display:none}
+@media(max-width:430px){.camera-guide{left:5%;width:90%;top:20%;aspect-ratio:1.72/1}.camera-previous-result{top:max(10px,env(safe-area-inset-top));font-size:13px;padding:9px 11px}}
