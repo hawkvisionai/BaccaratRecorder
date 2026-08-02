@@ -4,13 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="dark light" />
-  <title>Baccarat Platform Studio v16.7.1</title>
-  <link rel="stylesheet" href="style.css?v=16.7.1" />
+  <title>Baccarat Platform Studio v16.7.2</title>
+  <link rel="stylesheet" href="style.css?v=16.7.2" />
 </head>
 <body>
   <main class="container">
     <header class="topbar">
-      <div><h1>Baccarat Platform Studio</h1><p>v16.7.1</p></div>
+      <div><h1>Baccarat Platform Studio</h1><p>v16.7.2</p></div>
       <div id="userArea" class="user-area hidden">
         <div class="user-meta"><strong id="userDisplayName">—</strong><span id="userRoleBadge" class="role-badge">—</span></div>
         <button id="dashboardButton" class="primary hidden" type="button">管理總覽</button>
@@ -64,7 +64,6 @@
         <div id="completePanel">
           <div id="aiCaptureControls" class="ai-capture-controls hidden">
             <button id="aiCameraButton" class="primary camera-button" type="button">📷 拍照辨識</button>
-            <p class="ai-capture-note">請將上方「閒／VS／莊」與牌面完整對準取景框；拍攝後會立即辨識。</p>
           </div>
           <div id="cardSteps" class="card-steps"></div>
           <div id="completeSummary" class="complete-summary hidden"></div>
@@ -83,7 +82,9 @@
           </div>
         </div>
 
-        <button id="nextRoundButton" class="primary large" type="button" disabled>下一局</button>
+        <div id="nextRoundHome">
+          <button id="nextRoundButton" class="primary large" type="button" disabled>下一局</button>
+        </div>
         <p id="appMessage" class="message"></p>
         <div class="action-grid">
           <button id="undoButton" class="secondary" type="button">刪除上一局</button>
@@ -250,6 +251,6 @@
       </div>
     </div>
   </div>
-<script type="module" src="app.js?v=16.7.1"></script>
+<script type="module" src="app.js?v=16.7.2"></script>
 </body>
 </html>

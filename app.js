@@ -296,8 +296,20 @@ function setMode(next){
   $("modeWinnerOnly").classList.toggle("active",next==="winner_only");
   $("completePanel").classList.toggle("hidden",next!=="complete");
   $("winnerOnlyPanel").classList.toggle("hidden",next!=="winner_only");
+  syncNextRoundPlacement();
   renderCardInput(); updateWinnerOnlyUI(); updateRecordState();
 }
+
+function syncNextRoundPlacement(){
+  const button=$("nextRoundButton");
+  const aiControls=$("aiCaptureControls");
+  const home=$("nextRoundHome");
+  const shouldPlaceUnderCamera=mode==="complete"&&inputMethod==="ai";
+  const target=shouldPlaceUnderCamera?aiControls:home;
+  if(button.parentElement!==target)target.appendChild(button);
+  button.classList.toggle("ai-next-round",shouldPlaceUnderCamera);
+}
+
 function setInputMethod(next,{preserve=false}={}){
   if(next==="ai"&&!aiAllowed())return;
   if(next!=="ai")closeAiCamera();
@@ -306,6 +318,7 @@ function setInputMethod(next,{preserve=false}={}){
   $("manualInputMethod").classList.toggle("active",next==="manual");
   $("aiInputMethod").classList.toggle("active",next==="ai");
   $("aiCaptureControls").classList.toggle("hidden",next!=="ai");
+  syncNextRoundPlacement();
   renderCardInput();updateRecordState();
 }
 function renderExtra(g){
@@ -1021,6 +1034,6 @@ $("userManagerButton").onclick=openUserManager;$("closeUserManagerModal").onclic
 $("undoButton").onclick=deleteLastGame;$("refreshButton").onclick=async()=>{try{await Promise.all([loadCloudData(),loadVenues()])}catch(e){showMessage(appMessage,e.message||"重新整理失敗","error")}};$("loginButton").onclick=login;$("logoutButton").onclick=logout;
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("shoeDetailModal").classList.contains("hidden"))return closeDetailModal();if(!$("personnelDetailModal").classList.contains("hidden"))return closePersonnelDetail();if(!$("personnelStatsModal").classList.contains("hidden"))return closePersonnelStats();if(!$("finishedHistoryModal").classList.contains("hidden"))return closeFinishedHistory();if(!$("myRecentShoesModal").classList.contains("hidden"))return closeMyRecentShoes();if(!$("dashboardModal").classList.contains("hidden"))return closeDashboard();if(!$("userManagerModal").classList.contains("hidden"))return closeUserManager();if(!$("editShoeModal").classList.contains("hidden"))return closeEditModal();if(!$("shoeManagerModal").classList.contains("hidden"))return closeManagerModal();if(!$("newShoeModal").classList.contains("hidden"))return closeShoeModal()}if(e.key==="Enter"&&!loginPanel.classList.contains("hidden"))login()});
 
-renderCardInput();updateWinnerOnlyUI();updateRecordState();
+syncNextRoundPlacement();renderCardInput();updateWinnerOnlyUI();updateRecordState();
 supabase.auth.onAuthStateChange(async(_event,session)=>session?await showAuthenticated(session):showLoggedOut());
 const {data:{session}}=await supabase.auth.getSession();if(session)await showAuthenticated(session);else showLoggedOut();

@@ -396,3 +396,18 @@ button:disabled{opacity:.45;cursor:not-allowed}
   #cameraCaptureModal #cameraGuide .camera-card-guide.p3{left:17%!important;top:61%!important;width:22%!important;height:16%!important}
   #cameraCaptureModal #cameraGuide .camera-card-guide.b3{left:61%!important;top:61%!important;width:22%!important;height:16%!important}
 }
+
+
+/* v16.7.2：AI 模式將「下一局」移至拍照辨識按鈕正下方，移除說明文字。 */
+#nextRoundHome:empty{display:none}
+.ai-capture-controls .ai-next-round{
+  width:100%;
+  min-height:54px;
+  margin:2px 0 0;
+  font-size:20px;
+}
+.ai-capture-controls{gap:10px}
+@media (max-width:600px){
+  .ai-capture-controls .camera-button,
+  .ai-capture-controls .ai-next-round{min-height:52px}
+}
