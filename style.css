@@ -411,3 +411,23 @@ button:disabled{opacity:.45;cursor:not-allowed}
   .ai-capture-controls .camera-button,
   .ai-capture-controls .ai-next-round{min-height:52px}
 }
+
+
+/* v16.8 管理中心 */
+.dashboard-stats-four{grid-template-columns:repeat(4,minmax(0,1fr))}
+.dashboard-stat-button{width:100%;text-align:left;cursor:pointer;color:inherit;font:inherit}
+.dashboard-stat-button:hover{transform:translateY(-2px);border-color:#38bdf8;box-shadow:0 10px 24px rgba(14,165,233,.18)}
+.shoe-detail-summary{margin:10px 0 14px}
+.shoe-summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.shoe-summary-grid>div,.management-hand-grid>div{padding:12px;border:1px solid var(--line);border-radius:12px;background:rgba(15,23,42,.42)}
+.shoe-summary-grid small,.management-hand-grid small{display:block;color:var(--muted);margin-bottom:5px}
+.shoe-summary-grid b,.management-hand-grid b{display:block;overflow-wrap:anywhere}
+.shoe-games-button{width:100%;margin-bottom:14px}
+.management-game-card{padding:14px;border:1px solid var(--line);border-radius:14px;background:rgba(15,23,42,.48);margin-bottom:10px}
+.management-game-time{font-size:13px;color:var(--muted);margin:5px 0 10px}
+.management-hand-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.management-game-tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.management-game-tags span{padding:5px 8px;border-radius:999px;background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.25);font-size:12px}
+.winner-only-note{padding:10px;border-radius:10px;background:rgba(245,158,11,.11);color:#fbbf24}
+.management-shoe-card{width:100%;text-align:left}
+@media(max-width:720px){.dashboard-stats-four{grid-template-columns:repeat(2,minmax(0,1fr))}.shoe-summary-grid,.management-hand-grid{grid-template-columns:1fr}}

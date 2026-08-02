@@ -4,13 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="dark light" />
-  <title>Baccarat Platform Studio v16.7.2</title>
+  <title>Baccarat Platform Studio v16.8</title>
   <link rel="stylesheet" href="style.css?v=16.7.2" />
 </head>
 <body>
   <main class="container">
     <header class="topbar">
-      <div><h1>Baccarat Platform Studio</h1><p>v16.7.2</p></div>
+      <div><h1>Baccarat Platform Studio</h1><p>v16.8</p></div>
       <div id="userArea" class="user-area hidden">
         <div class="user-meta"><strong id="userDisplayName">—</strong><span id="userRoleBadge" class="role-badge">—</span></div>
         <button id="dashboardButton" class="primary hidden" type="button">管理總覽</button>
@@ -127,7 +127,9 @@
     <div class="modal-backdrop" data-close-detail="true"></div>
     <section class="modal-card manager-card">
       <div class="section-head"><div><h2 id="shoeDetailTitle">牌靴內容</h2><p id="shoeDetailMeta" class="section-note"></p></div><button id="closeDetailModal" class="icon-button" type="button" aria-label="關閉">×</button></div>
-      <div id="shoeDetailGames" class="recent-list"><p class="empty">讀取中…</p></div>
+      <div id="shoeDetailSummary" class="shoe-detail-summary"><p class="empty">讀取中…</p></div>
+      <button id="showShoeGamesButton" class="primary shoe-games-button hidden" type="button">查看各局記錄</button>
+      <div id="shoeDetailGames" class="recent-list hidden"><p class="empty">讀取中…</p></div>
     </section>
   </div>
 
@@ -151,12 +153,11 @@
         <button id="dashboardShoeSearchButton" class="primary" type="button">搜尋牌靴</button>
       </div>
       <div id="dashboardSearchResults" class="dashboard-search-results hidden"></div>
-      <div class="dashboard-stats dashboard-stats-five">
-        <article class="dashboard-stat"><span>進行中</span><strong id="statActiveShoes">0</strong><small>副牌靴</small></article>
-        <article class="dashboard-stat"><span>今日完成</span><strong id="statTodayFinished">0</strong><small>副牌靴</small></article>
-        <article class="dashboard-stat"><span>今日記錄</span><strong id="statTodayGames">0</strong><small>局</small></article>
-        <article class="dashboard-stat"><span>累計牌靴</span><strong id="statTotalShoes">0</strong><small>副</small></article>
-        <article class="dashboard-stat"><span>累計牌局</span><strong id="statTotalGames">0</strong><small>局</small></article>
+      <div class="dashboard-stats dashboard-stats-four">
+        <button class="dashboard-stat dashboard-stat-button" data-dashboard-view="active" type="button"><span>進行中牌靴</span><strong id="statActiveShoes">0</strong><small>副牌靴</small></button>
+        <button class="dashboard-stat dashboard-stat-button" data-dashboard-view="today" type="button"><span>今日完成牌靴</span><strong id="statTodayFinished">0</strong><small>副牌靴</small></button>
+        <button class="dashboard-stat dashboard-stat-button" data-dashboard-view="finished" type="button"><span>總完成牌靴數</span><strong id="statTotalShoes">0</strong><small>副</small></button>
+        <button class="dashboard-stat dashboard-stat-button" data-dashboard-view="games" type="button"><span>總累計局數</span><strong id="statTotalGames">0</strong><small>局</small></button>
       </div>
       <div class="dashboard-grid">
         <section class="dashboard-panel"><div class="section-head"><h3>進行中的牌靴</h3><span id="dashboardShoeSummary" class="mini-badge">—</span></div><div id="dashboardActiveShoes" class="dashboard-list"><p class="empty">讀取中…</p></div></section>
@@ -168,6 +169,17 @@
         <p id="dashboardPersonnelMessage" class="message"></p>
         <div id="dashboardPersonnelList" class="personnel-stats-list"><p class="empty">讀取中…</p></div>
       </section>
+    </section>
+  </div>
+
+  <div id="managementListModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="managementListTitle">
+    <div class="modal-backdrop" data-close-management-list="true"></div>
+    <section class="modal-card manager-card admin-detail-card">
+      <div class="section-head"><div><h2 id="managementListTitle">牌靴列表</h2><p id="managementListMeta" class="section-note">—</p></div><button id="closeManagementListModal" class="icon-button" type="button" aria-label="關閉">×</button></div>
+      <div class="admin-filter-row"><input id="managementListSearch" type="search" placeholder="搜尋牌靴編號、場館或記錄人員" /><span id="managementListCount" class="mini-badge">0</span></div>
+      <p id="managementListMessage" class="message"></p>
+      <div id="managementListBody" class="admin-record-list"><p class="empty">讀取中…</p></div>
+      <button id="managementLoadMoreButton" class="secondary hidden" type="button">載入更多</button>
     </section>
   </div>
 
