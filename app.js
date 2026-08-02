@@ -917,7 +917,7 @@ async function analyzeCapturedPhoto(file){
     try{ roiSheet=await buildRoiSheet(image); }
     catch(roiError){ console.warn("ROI sheet fallback",roiError); }
     const {data:{session}}=await supabase.auth.getSession();if(!session)throw new Error("登入已失效");
-    const payload={image,template:"dreamgaming_roi_v2"};
+    const payload={image,template:"dreamgaming_roi_v3_six_guides"};
     if(typeof roiSheet==="string"&&roiSheet.startsWith("data:image/")) payload.roi_sheet=roiSheet;
     const response=await fetch(AI_CAPTURE_FUNCTION_URL,{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:JSON.stringify(payload)});
     const result=await response.json().catch(()=>({}));if(!response.ok||result.ok===false)throw new Error(result.error||result.warning||`辨識服務錯誤（${response.status}）`);
