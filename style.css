@@ -378,3 +378,21 @@ button:disabled{opacity:.45;cursor:not-allowed}
   #cameraCaptureModal #cameraGuide .camera-card-guide span{font-size:10px!important;padding:2px 4px!important}
   #cameraCaptureModal #cameraGuide .camera-side-label{font-size:11px!important;padding:3px 7px!important}
 }
+
+
+/* v16.7.1：縮小可見六格，保留原本 AI 裁切邏輯與外層牌區框。 */
+#cameraCaptureModal #cameraGuide .camera-card-guide.p1{left:13%!important;top:28%!important;width:13%!important;height:27%!important}
+#cameraCaptureModal #cameraGuide .camera-card-guide.p2{left:31%!important;top:28%!important;width:13%!important;height:27%!important}
+#cameraCaptureModal #cameraGuide .camera-card-guide.b1{left:56%!important;top:28%!important;width:13%!important;height:27%!important}
+#cameraCaptureModal #cameraGuide .camera-card-guide.b2{left:74%!important;top:28%!important;width:13%!important;height:27%!important}
+#cameraCaptureModal #cameraGuide .camera-card-guide.p3{left:18%!important;top:61%!important;width:22%!important;height:17%!important}
+#cameraCaptureModal #cameraGuide .camera-card-guide.b3{left:60%!important;top:61%!important;width:22%!important;height:17%!important}
+#cameraCaptureModal #cameraGuide .camera-card-guide span{font-size:10px!important;padding:2px 4px!important}
+@media(max-width:430px){
+  #cameraCaptureModal #cameraGuide .camera-card-guide.p1{left:12%!important;top:29%!important;width:13%!important;height:26%!important}
+  #cameraCaptureModal #cameraGuide .camera-card-guide.p2{left:31%!important;top:29%!important;width:13%!important;height:26%!important}
+  #cameraCaptureModal #cameraGuide .camera-card-guide.b1{left:56%!important;top:29%!important;width:13%!important;height:26%!important}
+  #cameraCaptureModal #cameraGuide .camera-card-guide.b2{left:75%!important;top:29%!important;width:13%!important;height:26%!important}
+  #cameraCaptureModal #cameraGuide .camera-card-guide.p3{left:17%!important;top:61%!important;width:22%!important;height:16%!important}
+  #cameraCaptureModal #cameraGuide .camera-card-guide.b3{left:61%!important;top:61%!important;width:22%!important;height:16%!important}
+}
