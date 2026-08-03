@@ -1,5 +1,5 @@
-const APP_BUILD="16.8";
-console.info("Baccarat Platform Studio build",APP_BUILD);
+const APP_BUILD="record-1.0";
+console.info("HawkVision Record build",APP_BUILD);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 const SUPABASE_URL = "https://rwxujvpakpemiwkitltk.supabase.co";
