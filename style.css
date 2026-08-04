@@ -431,3 +431,89 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .winner-only-note{padding:10px;border-radius:10px;background:rgba(245,158,11,.11);color:#fbbf24}
 .management-shoe-card{width:100%;text-align:left}
 @media(max-width:720px){.dashboard-stats-four{grid-template-columns:repeat(2,minmax(0,1fr))}.shoe-summary-grid,.management-hand-grid{grid-template-columns:1fr}}
+
+
+/* v16.9 HawkVision brand integration */
+html{scrollbar-gutter:stable}
+body.brand-intro-active{overflow:hidden}
+.brand-intro{
+  position:fixed;inset:0;z-index:9999;display:grid;place-items:center;
+  background:#000;opacity:1;visibility:visible;
+  transition:opacity .44s ease,visibility .44s ease;
+}
+.brand-intro.is-leaving{opacity:0;visibility:hidden}
+.intro-brand{
+  display:flex;flex-direction:column;align-items:center;text-align:center;
+  animation:intro-brand-in .48s ease-out both;
+}
+.intro-logo-wrap{position:relative;width:min(50vw,360px);aspect-ratio:1}
+.intro-logo{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 0 22px rgba(139,92,246,.34))}
+.intro-eye-flash{
+  position:absolute;left:50.6%;top:55.2%;width:7.5%;aspect-ratio:1;border-radius:50%;
+  transform:translate(-50%,-50%);
+  background:radial-gradient(circle,#fff7c2 0 15%,#f5c542 28%,rgba(245,197,66,.5) 48%,transparent 72%);
+  opacity:0;animation:hawk-eye-blink 1.75s ease-in-out both;
+  box-shadow:0 0 10px #f5c542,0 0 24px rgba(245,197,66,.85),0 0 42px rgba(139,92,246,.35);
+}
+.intro-name{margin-top:-12px;color:#e5e7eb;font-size:clamp(34px,5.3vw,68px);font-weight:900;font-style:italic;letter-spacing:-.04em;line-height:1}
+.intro-name span,.brand-copy h1 span{color:#8b5cf6}
+.intro-slogan{margin-top:16px;color:#f5c542;font-size:clamp(11px,1.55vw,19px);font-weight:700;letter-spacing:.18em}
+@keyframes intro-brand-in{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes hawk-eye-blink{
+  0%,10%{opacity:0;transform:translate(-50%,-50%) scale(.55)}
+  18%{opacity:1;transform:translate(-50%,-50%) scale(1.28)}
+  28%{opacity:.12;transform:translate(-50%,-50%) scale(.84)}
+  42%{opacity:.7;transform:translate(-50%,-50%) scale(1)}
+  56%{opacity:.08}
+  72%{opacity:.48;transform:translate(-50%,-50%) scale(.92)}
+  86%,100%{opacity:0}
+}
+.container{opacity:0;transform:translateY(8px)}
+body.brand-ready .container{animation:brand-main-in .5s ease-out both}
+@keyframes brand-main-in{to{opacity:1;transform:translateY(0)}}
+
+.brand-lockup{display:flex;align-items:center;gap:13px;min-width:260px}
+.header-logo{width:72px;height:72px;object-fit:contain;flex:0 0 auto;filter:drop-shadow(0 0 10px rgba(139,92,246,.22))}
+.brand-copy h1{margin:0;font-size:30px;line-height:1;color:#e5e7eb;font-weight:900;letter-spacing:-.035em}
+.brand-copy p{margin:7px 0 0;color:#f5c542;font-size:10px;letter-spacing:.13em;font-weight:750;white-space:nowrap}
+.brand-flying-logo{position:fixed;z-index:10002;display:block;object-fit:contain;pointer-events:none;margin:0;padding:0}
+body.brand-target-layout .container{transform:none!important}
+body.brand-target-layout .header-logo{visibility:hidden}
+
+.login-card{
+  max-width:500px;
+  margin:56px auto;
+  border-color:rgba(139,92,246,.38);
+  background:
+    radial-gradient(circle at 80% 0%,rgba(124,77,255,.18),transparent 38%),
+    linear-gradient(145deg,rgba(18,28,48,.98),rgba(10,18,33,.98));
+  box-shadow:0 24px 80px rgba(0,0,0,.34),0 0 36px rgba(124,77,255,.08);
+}
+.login-brand{display:flex;align-items:center;gap:16px;margin-bottom:22px}
+.login-logo{width:76px;height:76px;object-fit:contain;filter:drop-shadow(0 0 12px rgba(139,92,246,.28))}
+.login-brand h2{font-size:30px;margin:4px 0 5px}
+.login-brand p{margin:0;color:var(--muted)}
+.login-kicker{font-size:11px;color:#f5c542;letter-spacing:.14em;font-weight:800}
+.login-card label{color:#dbeafe}
+.login-card input{background:rgba(248,250,252,.98)}
+.login-card .primary{background:linear-gradient(135deg,#6d4aff,#2563eb);box-shadow:0 10px 28px rgba(64,82,255,.26)}
+.login-note{text-align:center;color:var(--muted);font-size:13px}
+
+.user-actions .delete-user{background:#991b1b}
+.user-actions .delete-user:hover{background:#b91c1c}
+
+@media(max-width:620px){
+  .topbar{align-items:stretch}
+  .brand-lockup{min-width:0}
+  .header-logo{width:56px;height:56px}
+  .brand-copy h1{font-size:25px}
+  .brand-copy p{font-size:7.5px;letter-spacing:.08em}
+  .login-card{margin:28px auto}
+  .login-logo{width:62px;height:62px}
+  .login-brand h2{font-size:26px}
+  .intro-logo-wrap{width:min(70vw,300px)}
+}
+@media(prefers-reduced-motion:reduce){
+  .intro-brand,.intro-eye-flash,.brand-intro,.container{animation:none!important;transition:none!important}
+  .intro-eye-flash{display:none}
+}

@@ -4,13 +4,33 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="dark light" />
-  <title>HawkVision Record | HawkVision AI</title>
-  <link rel="stylesheet" href="style.css?v=record-1.0" />
+  <title>HawkVision</title>
+  <link rel="icon" type="image/png" href="favicon.png?v=1" />
+  <link rel="shortcut icon" href="favicon.ico?v=1" />
+  <link rel="apple-touch-icon" href="hawkvision-app-icon.png?v=1" />
+  <link rel="stylesheet" href="style.css?v=16.9" />
 </head>
-<body>
+<body class="brand-intro-active">
+  <div id="brandIntro" class="brand-intro" aria-label="HawkVision 品牌開場">
+    <div class="intro-brand">
+      <div class="intro-logo-wrap">
+        <img src="hawkvision-logo.png" alt="HawkVision Logo" class="intro-logo" />
+        <span class="intro-eye-flash" aria-hidden="true"></span>
+      </div>
+      <div class="intro-name">Hawk<span>Vision</span></div>
+      <div class="intro-slogan">SEE EVERY MOVE. STAY AHEAD.</div>
+    </div>
+  </div>
+
   <main class="container">
     <header class="topbar">
-      <div><h1>HawkVision Record</h1><p>Release 1.0</p></div>
+      <div class="brand-lockup">
+        <img src="hawkvision-logo.png" alt="HawkVision Logo" class="header-logo" />
+        <div class="brand-copy">
+          <h1>Hawk<span>Vision</span></h1>
+          <p>SEE EVERY MOVE. STAY AHEAD.</p>
+        </div>
+      </div>
       <div id="userArea" class="user-area hidden">
         <div class="user-meta"><strong id="userDisplayName">—</strong><span id="userRoleBadge" class="role-badge">—</span></div>
         <button id="dashboardButton" class="primary hidden" type="button">管理總覽</button>
@@ -20,7 +40,14 @@
     </header>
 
     <section id="loginPanel" class="card login-card">
-      <h2>人員登入</h2>
+      <div class="login-brand">
+        <img src="hawkvision-logo.png" alt="" class="login-logo" />
+        <div>
+          <span class="login-kicker">HAWKVISION RECORD STUDIO</span>
+          <h2>人員登入</h2>
+          <p>進入牌局記錄與管理平台</p>
+        </div>
+      </div>
       <label>帳號<input id="emailInput" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="管理員可用 Email；記錄員輸入帳號" /></label>
       <label>密碼<input id="passwordInput" type="password" autocomplete="current-password" placeholder="你的密碼" /></label>
       <button id="loginButton" class="primary" type="button">登入</button>
@@ -224,7 +251,7 @@
   <div id="userManagerModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="userManagerTitle">
     <div class="modal-backdrop" data-close-users="true"></div>
     <section class="modal-card manager-card">
-      <div class="section-head"><div><h2 id="userManagerTitle">人員管理</h2><p class="section-note">只有管理員可以建立、停用及重設記錄員帳號。</p></div><button id="closeUserManagerModal" class="icon-button" type="button" aria-label="關閉">×</button></div>
+      <div class="section-head"><div><h2 id="userManagerTitle">人員管理</h2><p class="section-note">管理員可以建立、停用、重設密碼及刪除尚無歷史紀錄的人員。</p></div><button id="closeUserManagerModal" class="icon-button" type="button" aria-label="關閉">×</button></div>
       <div class="user-create-grid">
         <label>顯示名稱<input id="newUserName" type="text" maxlength="40" placeholder="例如：小王" /></label>
         <label>登入帳號<input id="newUsername" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="30" placeholder="例如：recorder01" /></label>
@@ -263,6 +290,6 @@
       </div>
     </div>
   </div>
-<script type="module" src="app.js?v=record-1.0"></script>
+<script type="module" src="app.js?v=16.9"></script>
 </body>
 </html>

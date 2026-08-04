@@ -1,5 +1,65 @@
-const APP_BUILD="record-1.0";
-console.info("HawkVision Record build",APP_BUILD);
+
+const BRAND_INTRO_DELAY_MS = 2000;
+
+function finishBrandIntro(){
+  const intro=document.getElementById("brandIntro");
+  const introWrap=intro?.querySelector(".intro-logo-wrap");
+  const introLogo=intro?.querySelector(".intro-logo");
+  const headerLogo=document.querySelector(".header-logo");
+
+  if(!intro||!introWrap||!introLogo||!headerLogo){
+    intro?.remove();
+    document.body.classList.remove("brand-intro-active");
+    document.body.classList.add("brand-ready");
+    return;
+  }
+
+  document.body.classList.remove("brand-intro-active");
+  document.body.classList.add("brand-target-layout");
+
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const start=introLogo.getBoundingClientRect();
+    const target=headerLogo.getBoundingClientRect();
+
+    const flyer=document.createElement("img");
+    flyer.src=headerLogo.src;
+    flyer.alt="";
+    flyer.className="brand-flying-logo";
+    Object.assign(flyer.style,{left:`${start.left}px`,top:`${start.top}px`,width:`${start.width}px`,height:`${start.height}px`});
+    document.body.appendChild(flyer);
+    introWrap.style.opacity="0";
+
+    const lift=Math.max(22,Math.min(58,start.height*.12));
+    const midLeft=start.left+(target.left-start.left)*.58;
+    const midTop=start.top+(target.top-start.top)*.42-lift;
+    const midWidth=start.width+(target.width-start.width)*.66;
+    const midHeight=start.height+(target.height-start.height)*.66;
+
+    const flight=flyer.animate([
+      {left:`${start.left}px`,top:`${start.top}px`,width:`${start.width}px`,height:`${start.height}px`,filter:"drop-shadow(0 0 22px rgba(139,92,246,.34))"},
+      {left:`${midLeft}px`,top:`${midTop}px`,width:`${midWidth}px`,height:`${midHeight}px`,offset:.58,filter:"drop-shadow(0 0 18px rgba(139,92,246,.28))"},
+      {left:`${target.left}px`,top:`${target.top}px`,width:`${target.width}px`,height:`${target.height}px`,filter:"drop-shadow(0 0 10px rgba(139,92,246,.22))"}
+    ],{duration:580,easing:"cubic-bezier(.22,.8,.24,1)",fill:"forwards"});
+
+    setTimeout(()=>document.body.classList.add("brand-ready"),250);
+    flight.addEventListener("finish",()=>{
+      headerLogo.style.visibility="visible";
+      flyer.remove();
+      intro.classList.add("is-leaving");
+      document.body.classList.remove("brand-target-layout");
+      document.body.classList.add("brand-ready");
+      setTimeout(()=>intro.remove(),500);
+    },{once:true});
+  }));
+}
+
+window.addEventListener("load",()=>{
+  const reduceMotion=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  setTimeout(finishBrandIntro,reduceMotion?150:BRAND_INTRO_DELAY_MS);
+});
+
+const APP_BUILD="16.9";
+console.info("HawkVision Record Studio build",APP_BUILD);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 const SUPABASE_URL = "https://rwxujvpakpemiwkitltk.supabase.co";
@@ -1066,7 +1126,7 @@ async function loadManagedUsers(){
 function renderManagedUsers(){
   $("userManagerList").innerHTML=managedUsers.length?managedUsers.map(u=>{
     const admin=u.role==="admin",self=u.id===currentUser?.id,active=u.is_active!==false,ai=admin||u.ai_capture_enabled===true;
-    const online=isOnlineUser(u.id);return `<div class="user-manager-row"><div><strong><span class="presence-dot ${online?"online":"offline"}"></span>${escapeHtml(u.display_name||u.email)}</strong><small>${escapeHtml(u.username||u.email)}｜${online?"目前在線":"目前離線"}</small></div><span class="role-badge ${admin?"admin":"recorder"}">${admin?"管理員":"記錄員"}</span><span class="account-state ${active?"active":"disabled"}">${active?"啟用":"停用"}</span><div class="ai-permission"><span>AI 辨識</span><i class="permission-light ${ai?"on":"off"}" aria-label="${ai?"可使用":"不可使用"}"></i></div><div class="user-actions">${admin?"":`<button class="secondary" data-user-action="password" data-id="${u.id}">重設密碼</button><button class="${active?"danger":"success"}" data-user-action="active" data-id="${u.id}">${active?"停用":"啟用"}</button><button class="secondary" data-user-action="ai" data-id="${u.id}">切換 AI</button>`}${self?'<span class="self-label">目前帳號</span>':""}</div></div>`
+    const online=isOnlineUser(u.id);return `<div class="user-manager-row"><div><strong><span class="presence-dot ${online?"online":"offline"}"></span>${escapeHtml(u.display_name||u.email)}</strong><small>${escapeHtml(u.username||u.email)}｜${online?"目前在線":"目前離線"}</small></div><span class="role-badge ${admin?"admin":"recorder"}">${admin?"管理員":"記錄員"}</span><span class="account-state ${active?"active":"disabled"}">${active?"啟用":"停用"}</span><div class="ai-permission"><span>AI 辨識</span><i class="permission-light ${ai?"on":"off"}" aria-label="${ai?"可使用":"不可使用"}"></i></div><div class="user-actions">${admin?"":`<button class="secondary" data-user-action="password" data-id="${u.id}">重設密碼</button><button class="${active?"danger":"success"}" data-user-action="active" data-id="${u.id}">${active?"停用":"啟用"}</button><button class="secondary" data-user-action="ai" data-id="${u.id}">切換 AI</button><button class="delete-user" data-user-action="delete" data-id="${u.id}">刪除人員</button>`}${self?'<span class="self-label">目前帳號</span>':""}</div></div>`
   }).join(""):'<p class="empty">尚無人員資料</p>';
   document.querySelectorAll("[data-user-action]").forEach(b=>b.onclick=()=>handleManagedUserAction(b.dataset.userAction,b.dataset.id));
 }
@@ -1091,6 +1151,21 @@ async function handleManagedUserAction(action,id){
   if(action==="ai"){
     const enabled=user.ai_capture_enabled!==true;
     setBusy(true);try{await callUserAdmin("set_ai_capture",{user_id:id,enabled});showSaveToast(enabled?"✓ AI 辨識權限已開啟":"✓ AI 辨識權限已關閉");await loadManagedUsers()}catch(e){showMessage($("userManagerMessage"),e.message||"AI 權限更新失敗","error")}finally{setBusy(false)}
+  }
+  if(action==="delete"){
+    const name=user.display_name||user.username||user.email;
+    const confirmed=confirm(`確定要永久刪除「${name}」嗎？\n\n只有尚未建立任何牌靴或牌局紀錄的人員才能永久刪除。此操作無法復原。`);
+    if(!confirmed)return;
+    const typed=prompt(`為避免誤刪，請輸入「刪除」確認永久刪除 ${name}`);
+    if(typed!=="刪除")return showMessage($("userManagerMessage"),"已取消刪除","error");
+    setBusy(true);
+    try{
+      await callUserAdmin("delete",{user_id:id});
+      showSaveToast("✓ 人員已永久刪除");
+      await loadManagedUsers();
+    }catch(e){
+      showMessage($("userManagerMessage"),e.message||"刪除失敗","error");
+    }finally{setBusy(false)}
   }
 }
 
