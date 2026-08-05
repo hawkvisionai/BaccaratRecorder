@@ -44,13 +44,6 @@ function finishBrandIntro(){
     const midWidth=start.width+(target.width-start.width)*.66;
     const midHeight=start.height+(target.height-start.height)*.66;
 
-    const flight=flyer.animate([
-      {left:`${start.left}px`,top:`${start.top}px`,width:`${start.width}px`,height:`${start.height}px`,filter:"drop-shadow(0 0 22px rgba(139,92,246,.34))"},
-      {left:`${midLeft}px`,top:`${midTop}px`,width:`${midWidth}px`,height:`${midHeight}px`,offset:.58,filter:"drop-shadow(0 0 18px rgba(139,92,246,.28))"},
-      {left:`${target.left}px`,top:`${target.top}px`,width:`${target.width}px`,height:`${target.height}px`,filter:"drop-shadow(0 0 10px rgba(139,92,246,.22))"}
-    ],{duration:580,easing:"cubic-bezier(.22,.8,.24,1)",fill:"forwards"});
-
-    setTimeout(()=>document.body.classList.add("brand-ready"),250);
     let completed=false;
     const complete=()=>{
       if(completed)return;
@@ -63,15 +56,38 @@ function finishBrandIntro(){
       setTimeout(()=>intro.remove(),500);
     };
 
-    flight.addEventListener("finish",complete,{once:true});
-    flight.addEventListener("cancel",complete,{once:true});
-    setTimeout(complete,1200);
+    // 改用 CSS transition，iPhone／LINE 內建瀏覽器較穩定。
+    Object.assign(flyer.style,{
+      transition:[
+        "left 580ms cubic-bezier(.22,.8,.24,1)",
+        "top 580ms cubic-bezier(.22,.8,.24,1)",
+        "width 580ms cubic-bezier(.22,.8,.24,1)",
+        "height 580ms cubic-bezier(.22,.8,.24,1)",
+        "filter 580ms ease"
+      ].join(","),
+      willChange:"left,top,width,height,filter"
+    });
+
+    setTimeout(()=>document.body.classList.add("brand-ready"),250);
+
+    requestAnimationFrame(()=>requestAnimationFrame(()=>{
+      Object.assign(flyer.style,{
+        left:`${target.left}px`,
+        top:`${target.top}px`,
+        width:`${target.width}px`,
+        height:`${target.height}px`,
+        filter:"drop-shadow(0 0 10px rgba(139,92,246,.22))"
+      });
+    }));
+
+    flyer.addEventListener("transitionend",complete,{once:true});
+    setTimeout(complete,900);
   }));
 }
 
 window.addEventListener("load",()=>{
   const reduceMotion=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  setTimeout(finishBrandIntro,reduceMotion?150:BRAND_INTRO_DELAY_MS);
+  setTimeout(finishBrandIntro,reduceMotion?900:BRAND_INTRO_DELAY_MS);
 });
 
 setTimeout(forceFinishBrandIntro,BRAND_INTRO_FAILSAFE_MS);

@@ -528,3 +528,11 @@ body:not(.brand-intro-active) .container{
   opacity:1;
   transform:none;
 }
+
+
+/* v16.9.2｜恢復手機版 Logo 飛行轉場 */
+.brand-flying-logo{
+  transform:translateZ(0);
+  backface-visibility:hidden;
+  -webkit-backface-visibility:hidden;
+}
