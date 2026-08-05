@@ -517,3 +517,14 @@ body.brand-target-layout .header-logo{visibility:hidden}
   .intro-brand,.intro-eye-flash,.brand-intro,.container{animation:none!important;transition:none!important}
   .intro-eye-flash{display:none}
 }
+
+
+/* v16.9.1｜iOS 內建瀏覽器品牌動畫防卡死 */
+body.brand-ready .container{
+  opacity:1 !important;
+  transform:none !important;
+}
+body:not(.brand-intro-active) .container{
+  opacity:1;
+  transform:none;
+}

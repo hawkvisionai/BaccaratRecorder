@@ -1,5 +1,16 @@
 
 const BRAND_INTRO_DELAY_MS = 2000;
+const BRAND_INTRO_FAILSAFE_MS = 4200;
+
+function forceFinishBrandIntro(){
+  const intro=document.getElementById("brandIntro");
+  document.querySelectorAll(".brand-flying-logo").forEach(el=>el.remove());
+  if(intro) intro.remove();
+  document.body.classList.remove("brand-intro-active","brand-target-layout");
+  document.body.classList.add("brand-ready");
+  const headerLogo=document.querySelector(".header-logo");
+  if(headerLogo) headerLogo.style.visibility="visible";
+}
 
 function finishBrandIntro(){
   const intro=document.getElementById("brandIntro");
@@ -8,9 +19,7 @@ function finishBrandIntro(){
   const headerLogo=document.querySelector(".header-logo");
 
   if(!intro||!introWrap||!introLogo||!headerLogo){
-    intro?.remove();
-    document.body.classList.remove("brand-intro-active");
-    document.body.classList.add("brand-ready");
+    forceFinishBrandIntro();
     return;
   }
 
@@ -42,14 +51,21 @@ function finishBrandIntro(){
     ],{duration:580,easing:"cubic-bezier(.22,.8,.24,1)",fill:"forwards"});
 
     setTimeout(()=>document.body.classList.add("brand-ready"),250);
-    flight.addEventListener("finish",()=>{
+    let completed=false;
+    const complete=()=>{
+      if(completed)return;
+      completed=true;
       headerLogo.style.visibility="visible";
       flyer.remove();
       intro.classList.add("is-leaving");
       document.body.classList.remove("brand-target-layout");
       document.body.classList.add("brand-ready");
       setTimeout(()=>intro.remove(),500);
-    },{once:true});
+    };
+
+    flight.addEventListener("finish",complete,{once:true});
+    flight.addEventListener("cancel",complete,{once:true});
+    setTimeout(complete,1200);
   }));
 }
 
@@ -57,6 +73,8 @@ window.addEventListener("load",()=>{
   const reduceMotion=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   setTimeout(finishBrandIntro,reduceMotion?150:BRAND_INTRO_DELAY_MS);
 });
+
+setTimeout(forceFinishBrandIntro,BRAND_INTRO_FAILSAFE_MS);
 
 const APP_BUILD="16.9";
 console.info("HawkVision Record Studio build",APP_BUILD);
