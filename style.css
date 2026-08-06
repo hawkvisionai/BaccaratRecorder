@@ -536,3 +536,128 @@ body:not(.brand-intro-active) .container{
   backface-visibility:hidden;
   -webkit-backface-visibility:hidden;
 }
+
+
+/* v16.10｜管理總覽「搜尋紀錄」與時間範圍統計 */
+.record-search-panel{
+  margin:12px 0 14px;
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:linear-gradient(145deg,#0c1728,#101c30);
+}
+.record-search-heading{margin-bottom:10px}
+.record-search-heading h3{margin:0}
+.record-search-fields{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+}
+.record-search-fields label{
+  display:grid;
+  gap:6px;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:800;
+}
+.record-search-fields select,
+.record-search-fields input{
+  width:100%;
+  min-width:0;
+}
+.record-search-actions{
+  display:flex;
+  gap:10px;
+  justify-content:flex-end;
+  margin-top:12px;
+}
+.record-search-results{
+  margin-bottom:16px;
+}
+.record-summary-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+  margin:10px 0 14px;
+}
+.record-summary-grid>div{
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  text-align:center;
+  background:var(--card2);
+}
+.record-summary-grid span,
+.record-summary-grid small{
+  display:block;
+  color:var(--muted);
+}
+.record-summary-grid strong{
+  display:block;
+  margin:6px 0 2px;
+  font-size:28px;
+}
+.record-breakdown-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+}
+.record-breakdown-card{
+  min-width:0;
+  padding:12px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:#0a1423;
+}
+.record-breakdown-card h4{margin:0}
+.record-breakdown-list{
+  display:grid;
+  gap:7px;
+  max-height:280px;
+  overflow:auto;
+  padding-right:3px;
+}
+.record-breakdown-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px;
+  border-radius:10px;
+  background:var(--card2);
+}
+.record-breakdown-row strong{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.record-breakdown-row span{
+  flex:0 0 auto;
+  color:var(--muted);
+  font-size:12px;
+}
+.record-detail-actions{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-top:14px;
+}
+.record-search-detail-list{
+  margin-top:10px;
+  max-height:520px;
+  overflow:auto;
+  padding-right:4px;
+}
+@media(max-width:980px){
+  .record-search-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .record-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:700px){
+  .record-search-fields{grid-template-columns:1fr}
+  .record-search-actions{display:grid;grid-template-columns:1fr 1fr}
+  .record-breakdown-grid{grid-template-columns:1fr}
+  .record-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .record-breakdown-row{align-items:flex-start}
+}

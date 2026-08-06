@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="favicon.png?v=1" />
   <link rel="shortcut icon" href="favicon.ico?v=1" />
   <link rel="apple-touch-icon" href="hawkvision-app-icon.png?v=1" />
-  <link rel="stylesheet" href="style.css?v=16.9.2" />
+  <link rel="stylesheet" href="style.css?v=16.10" />
 </head>
 <body class="brand-intro-active">
   <div id="brandIntro" class="brand-intro" aria-label="HawkVision 品牌開場">
@@ -173,13 +173,73 @@
   <div id="dashboardModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="dashboardTitle">
     <div class="modal-backdrop" data-close-dashboard="true"></div>
     <section class="modal-card dashboard-card">
-      <div class="section-head dashboard-heading"><div><h2 id="dashboardTitle">管理總覽</h2><p class="section-note">查看目前與最近完成的牌靴，並快速查找歷史牌靴。</p></div><div class="dashboard-head-actions"><span id="dashboardUpdatedAt" class="dashboard-updated">—</span><button id="refreshDashboardButton" class="secondary compact" type="button">重新整理</button><button id="closeDashboardModal" class="icon-button" type="button" aria-label="關閉">×</button></div></div>
+      <div class="section-head dashboard-heading"><div><h2 id="dashboardTitle">管理總覽</h2><p class="section-note">查看目前狀態，並依場館、人員與精確時間範圍統計完成紀錄。</p></div><div class="dashboard-head-actions"><span id="dashboardUpdatedAt" class="dashboard-updated">—</span><button id="refreshDashboardButton" class="secondary compact" type="button">重新整理</button><button id="closeDashboardModal" class="icon-button" type="button" aria-label="關閉">×</button></div></div>
       <p id="dashboardMessage" class="message"></p>
-      <div class="dashboard-search">
-        <input id="dashboardShoeSearchInput" type="search" placeholder="輸入牌靴編號、名稱或場館" />
-        <button id="dashboardShoeSearchButton" class="primary" type="button">搜尋牌靴</button>
-      </div>
-      <div id="dashboardSearchResults" class="dashboard-search-results hidden"></div>
+
+      <section class="record-search-panel">
+        <div class="section-head record-search-heading">
+          <div>
+            <h3>搜尋紀錄</h3>
+            <p class="section-note">時間以牌靴完成時間計算，可精確到年份、月份、日期與時間點。</p>
+          </div>
+        </div>
+        <div class="record-search-fields">
+          <label>場館
+            <select id="dashboardRecordVenue">
+              <option value="">全部場館</option>
+            </select>
+          </label>
+          <label>記錄人員
+            <select id="dashboardRecordPersonnel">
+              <option value="">全部人員</option>
+            </select>
+          </label>
+          <label>開始時間
+            <input id="dashboardRecordStart" type="datetime-local" />
+          </label>
+          <label>結束時間
+            <input id="dashboardRecordEnd" type="datetime-local" />
+          </label>
+        </div>
+        <div class="record-search-actions">
+          <button id="dashboardRecordSearchButton" class="primary" type="button">搜尋紀錄</button>
+          <button id="dashboardRecordResetButton" class="secondary" type="button">清除條件</button>
+        </div>
+      </section>
+
+      <section id="dashboardSearchResults" class="dashboard-search-results record-search-results hidden">
+        <div class="section-head">
+          <div>
+            <h3>搜尋統計</h3>
+            <p id="dashboardSearchMeta" class="section-note">—</p>
+          </div>
+          <button id="closeDashboardSearchResults" class="icon-button" type="button" aria-label="關閉搜尋結果">×</button>
+        </div>
+
+        <div class="record-summary-grid">
+          <div><span>完成牌靴總數</span><strong id="recordSearchShoeTotal">0</strong><small>副</small></div>
+          <div><span>總累計局數</span><strong id="recordSearchGameTotal">0</strong><small>局</small></div>
+          <div><span>涵蓋場館</span><strong id="recordSearchVenueTotal">0</strong><small>個</small></div>
+          <div><span>記錄人員</span><strong id="recordSearchPersonnelTotal">0</strong><small>人</small></div>
+        </div>
+
+        <div class="record-breakdown-grid">
+          <section class="record-breakdown-card">
+            <div class="section-head"><h4>各場館完成統計</h4><span id="recordVenueBreakdownCount" class="mini-badge">0</span></div>
+            <div id="recordVenueBreakdown" class="record-breakdown-list"><p class="empty">尚未搜尋</p></div>
+          </section>
+          <section class="record-breakdown-card">
+            <div class="section-head"><h4>各人員完成統計</h4><span id="recordPersonnelBreakdownCount" class="mini-badge">0</span></div>
+            <div id="recordPersonnelBreakdown" class="record-breakdown-list"><p class="empty">尚未搜尋</p></div>
+          </section>
+        </div>
+
+        <div class="record-detail-actions">
+          <button id="toggleRecordSearchDetails" class="secondary" type="button">查看符合的牌靴明細</button>
+          <span id="recordSearchDetailCount" class="mini-badge">0 副</span>
+        </div>
+        <div id="recordSearchDetailList" class="admin-record-list record-search-detail-list hidden"></div>
+      </section>
       <div class="dashboard-stats dashboard-stats-four">
         <button class="dashboard-stat dashboard-stat-button" data-dashboard-view="active" type="button"><span>進行中牌靴</span><strong id="statActiveShoes">0</strong><small>副牌靴</small></button>
         <button class="dashboard-stat dashboard-stat-button" data-dashboard-view="today" type="button"><span>今日完成牌靴</span><strong id="statTodayFinished">0</strong><small>副牌靴</small></button>
@@ -290,6 +350,6 @@
       </div>
     </div>
   </div>
-<script type="module" src="app.js?v=16.9.2"></script>
+<script type="module" src="app.js?v=16.10"></script>
 </body>
 </html>

@@ -92,7 +92,7 @@ window.addEventListener("load",()=>{
 
 setTimeout(forceFinishBrandIntro,BRAND_INTRO_FAILSAFE_MS);
 
-const APP_BUILD="16.9";
+const APP_BUILD="16.10";
 console.info("HawkVision Record Studio build",APP_BUILD);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
@@ -140,6 +140,8 @@ let aiCorrected = false;
 let managementListData = [];
 let managementListType = "";
 let managementGamesOffset = 0;
+let recordSearchData = [];
+let recordSearchDetailsVisible = false;
 
 const loginPanel = $("loginPanel");
 const appPanel = $("appPanel");
@@ -637,12 +639,16 @@ async function openManagementList(type){
     renderManagementList();
   }catch(e){showMessage($("managementListMessage"),e.message||"讀取失敗","error");$("managementListBody").innerHTML='<p class="empty">讀取失敗</p>';}
 }
-function closeDashboard(){if(!busy)$("dashboardModal").classList.add("hidden")}
+function closeDashboard(){
+  if(busy)return;
+  closeDashboardSearchResultsPanel();
+  $("dashboardModal").classList.add("hidden");
+}
 async function openDashboard(){
   if(currentProfile?.role!=="admin")return;
   $("dashboardModal").classList.remove("hidden");
   $("dashboardMessage").textContent="";
-  await loadDashboard();
+  await Promise.all([loadDashboard(), loadRecordSearchOptions()]);
 }
 function scheduleDashboardReload(){
   if(currentProfile?.role!=="admin"||!isModalOpen("dashboardModal"))return;
@@ -804,18 +810,206 @@ async function openPersonnelDetail(personId){
   catch(e){$("personnelDetailList").innerHTML=`<p class="empty">${escapeHtml(e.message||"讀取失敗")}</p>`;}
 }
 
-async function searchDashboardShoes(){
-  const input=$("dashboardShoeSearchInput"),box=$("dashboardSearchResults"),q=input.value.trim();
-  if(!q){box.classList.add("hidden");box.innerHTML="";return}
-  box.classList.remove("hidden");box.innerHTML='<p class="empty">搜尋中…</p>';
-  const safe=q.replace(/[%_,]/g," ").trim();
+function toLocalDateTimeValue(date){
+  const pad=n=>String(n).padStart(2,"0");
+  return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function defaultRecordSearchRange(){
+  const end=new Date();
+  const start=new Date(end);
+  start.setDate(start.getDate()-7);
+  start.setHours(0,0,0,0);
+  $("dashboardRecordStart").value=toLocalDateTimeValue(start);
+  $("dashboardRecordEnd").value=toLocalDateTimeValue(end);
+}
+
+async function loadRecordSearchOptions(){
+  const venueSelect=$("dashboardRecordVenue");
+  const personnelSelect=$("dashboardRecordPersonnel");
   try{
-    const {data,error}=await supabase.from("shoes").select("id,shoe_number,name,venue,status,owner_id,created_at,recording_started_at,finished_at,is_archived").or(`shoe_number.ilike.%${safe}%,name.ilike.%${safe}%,venue.ilike.%${safe}%`).order("created_at",{ascending:false}).limit(20);
-    if(error)throw error;
-    const rows=data||[];
-    box.innerHTML=rows.length?rows.map(s=>`<button class="dashboard-search-row" data-search-shoe-id="${s.id}" type="button"><strong>${escapeHtml(s.shoe_number||"未命名")}</strong><span>${escapeHtml(s.venue||"未選場館")}｜${s.status==="open"?"進行中":"已完成"}｜${formatDate(s.finished_at||s.created_at)}</span></button>`).join(""):'<p class="empty">找不到符合的牌靴</p>';
-    document.querySelectorAll("[data-search-shoe-id]").forEach(b=>b.onclick=async()=>{const shoe=rows.find(s=>String(s.id)===String(b.dataset.searchShoeId));if(shoe)await viewShoe(shoe)});
-  }catch(e){box.innerHTML=`<p class="empty">${escapeHtml(e.message||"搜尋失敗")}</p>`}
+    const [venuesR,profilesR]=await Promise.all([
+      supabase.from("shoes").select("venue").not("venue","is",null),
+      supabase.from("profiles").select("id,display_name,username,email").order("display_name",{ascending:true})
+    ]);
+    if(venuesR.error)throw venuesR.error;
+    if(profilesR.error)throw profilesR.error;
+
+    const currentVenue=venueSelect.value;
+    const currentPersonnel=personnelSelect.value;
+    const venues=[...new Set((venuesR.data||[]).map(x=>(x.venue||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"zh-Hant"));
+    venueSelect.innerHTML='<option value="">全部場館</option>'+venues.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
+    if(venues.includes(currentVenue))venueSelect.value=currentVenue;
+
+    const people=(profilesR.data||[]).map(p=>({
+      id:p.id,
+      label:p.display_name||p.username||p.email||"未命名人員"
+    })).sort((a,b)=>a.label.localeCompare(b.label,"zh-Hant"));
+    personnelSelect.innerHTML='<option value="">全部人員</option>'+people.map(p=>`<option value="${escapeHtml(p.id)}">${escapeHtml(p.label)}</option>`).join("");
+    if(people.some(p=>String(p.id)===String(currentPersonnel)))personnelSelect.value=currentPersonnel;
+
+    if(!$("dashboardRecordStart").value&&!$("dashboardRecordEnd").value)defaultRecordSearchRange();
+  }catch(e){
+    showMessage($("dashboardMessage"),e.message||"讀取搜尋條件失敗","error");
+  }
+}
+
+async function fetchAllRows(makeQuery,pageSize=1000){
+  const all=[];
+  let from=0;
+  while(true){
+    const result=await makeQuery().range(from,from+pageSize-1);
+    if(result.error)throw result.error;
+    const rows=result.data||[];
+    all.push(...rows);
+    if(rows.length<pageSize)break;
+    from+=pageSize;
+  }
+  return all;
+}
+
+async function attachRecordSearchDetails(shoes){
+  if(!shoes.length)return [];
+
+  const ownerIds=[...new Set(shoes.map(s=>s.owner_id).filter(Boolean))];
+  let ownerMap=new Map();
+  if(ownerIds.length){
+    const profiles=await fetchAllRows(()=>supabase.from("profiles").select("id,display_name,username,email").in("id",ownerIds));
+    ownerMap=new Map(profiles.map(p=>[String(p.id),p.display_name||p.username||p.email||"未命名人員"]));
+  }
+
+  const gameMap=new Map();
+  const shoeIds=shoes.map(s=>s.id);
+  for(let i=0;i<shoeIds.length;i+=100){
+    const batch=shoeIds.slice(i,i+100);
+    const games=await fetchAllRows(()=>supabase.from("games").select("id,shoe_id").in("shoe_id",batch));
+    games.forEach(g=>{
+      const key=String(g.shoe_id);
+      gameMap.set(key,(gameMap.get(key)||0)+1);
+    });
+  }
+
+  return shoes.map(s=>({
+    ...s,
+    owner_name:ownerMap.get(String(s.owner_id))||"未指定",
+    count:gameMap.get(String(s.id))||0
+  }));
+}
+
+function aggregateRecordSearch(rows,keyFn){
+  const map=new Map();
+  rows.forEach(row=>{
+    const key=keyFn(row)||"未指定";
+    const current=map.get(key)||{label:key,shoes:0,games:0};
+    current.shoes+=1;
+    current.games+=Number(row.count)||0;
+    map.set(key,current);
+  });
+  return [...map.values()].sort((a,b)=>b.shoes-a.shoes||b.games-a.games||a.label.localeCompare(b.label,"zh-Hant"));
+}
+
+function breakdownRow(item){
+  return `<div class="record-breakdown-row"><strong>${escapeHtml(item.label)}</strong><span><b>${item.shoes}</b> 副｜<b>${item.games}</b> 局</span></div>`;
+}
+
+function renderRecordSearchResults(rows,start,end){
+  recordSearchData=rows;
+  recordSearchDetailsVisible=false;
+
+  const venueBreakdown=aggregateRecordSearch(rows,s=>s.venue||"未選場館");
+  const personnelBreakdown=aggregateRecordSearch(rows,s=>s.owner_name||"未指定");
+  const totalGames=rows.reduce((sum,s)=>sum+(Number(s.count)||0),0);
+
+  $("recordSearchShoeTotal").textContent=rows.length;
+  $("recordSearchGameTotal").textContent=totalGames;
+  $("recordSearchVenueTotal").textContent=venueBreakdown.length;
+  $("recordSearchPersonnelTotal").textContent=personnelBreakdown.length;
+  $("recordVenueBreakdownCount").textContent=`${venueBreakdown.length} 個`;
+  $("recordPersonnelBreakdownCount").textContent=`${personnelBreakdown.length} 人`;
+  $("recordVenueBreakdown").innerHTML=venueBreakdown.length?venueBreakdown.map(breakdownRow).join(""):'<p class="empty">沒有符合的場館紀錄</p>';
+  $("recordPersonnelBreakdown").innerHTML=personnelBreakdown.length?personnelBreakdown.map(breakdownRow).join(""):'<p class="empty">沒有符合的人員紀錄</p>';
+  $("recordSearchDetailCount").textContent=`${rows.length} 副`;
+  $("recordSearchDetailList").classList.add("hidden");
+  $("recordSearchDetailList").innerHTML=rows.length?rows.map(adminRecordCard).join(""):'<p class="empty">沒有符合條件的完成紀錄</p>';
+  $("toggleRecordSearchDetails").textContent="查看符合的牌靴明細";
+  $("toggleRecordSearchDetails").disabled=!rows.length;
+
+  const venueLabel=$("dashboardRecordVenue").selectedOptions[0]?.textContent||"全部場館";
+  const personLabel=$("dashboardRecordPersonnel").selectedOptions[0]?.textContent||"全部人員";
+  $("dashboardSearchMeta").textContent=`${formatDate(start)} 至 ${formatDate(end)}｜${venueLabel}｜${personLabel}`;
+  $("dashboardSearchResults").classList.remove("hidden");
+
+  document.querySelectorAll("#recordSearchDetailList [data-admin-shoe-id]").forEach(button=>{
+    button.onclick=async()=>{
+      const shoe=recordSearchData.find(x=>String(x.id)===String(button.dataset.adminShoeId));
+      if(shoe)await viewShoe(shoe);
+    };
+  });
+}
+
+async function searchDashboardRecords(){
+  const startValue=$("dashboardRecordStart").value;
+  const endValue=$("dashboardRecordEnd").value;
+  if(!startValue||!endValue){
+    return showMessage($("dashboardMessage"),"請完整選擇開始時間與結束時間","error");
+  }
+
+  const start=new Date(startValue);
+  const end=new Date(endValue);
+  if(Number.isNaN(start.getTime())||Number.isNaN(end.getTime())){
+    return showMessage($("dashboardMessage"),"時間格式不正確","error");
+  }
+  if(start>end){
+    return showMessage($("dashboardMessage"),"開始時間不能晚於結束時間","error");
+  }
+
+  const venue=$("dashboardRecordVenue").value;
+  const personnel=$("dashboardRecordPersonnel").value;
+  const box=$("dashboardSearchResults");
+  box.classList.remove("hidden");
+  box.innerHTML='<p class="empty">正在統計完成牌靴與局數…</p>';
+  $("dashboardMessage").textContent="";
+
+  try{
+    const rows=await fetchAllRows(()=>{
+      let q=supabase.from("shoes")
+        .select("id,shoe_number,name,venue,status,owner_id,created_at,recording_started_at,finished_at,is_archived")
+        .not("finished_at","is",null)
+        .eq("is_archived",false)
+        .gte("finished_at",start.toISOString())
+        .lte("finished_at",end.toISOString())
+        .order("finished_at",{ascending:false});
+      if(venue)q=q.eq("venue",venue);
+      if(personnel)q=q.eq("owner_id",personnel);
+      return q;
+    });
+    const detailed=await attachRecordSearchDetails(rows);
+    renderRecordSearchResults(detailed,start,end);
+  }catch(e){
+    box.innerHTML=`<p class="empty">${escapeHtml(e.message||"搜尋紀錄失敗")}</p>`;
+  }
+}
+
+function closeDashboardSearchResultsPanel(){
+  recordSearchData=[];
+  recordSearchDetailsVisible=false;
+  const box=$("dashboardSearchResults");
+  if(box)box.classList.add("hidden");
+}
+
+function resetDashboardRecordSearch(){
+  $("dashboardRecordVenue").value="";
+  $("dashboardRecordPersonnel").value="";
+  defaultRecordSearchRange();
+  closeDashboardSearchResultsPanel();
+  $("dashboardMessage").textContent="";
+}
+
+function toggleRecordSearchDetails(){
+  if(!recordSearchData.length)return;
+  recordSearchDetailsVisible=!recordSearchDetailsVisible;
+  $("recordSearchDetailList").classList.toggle("hidden",!recordSearchDetailsVisible);
+  $("toggleRecordSearchDetails").textContent=recordSearchDetailsVisible?"隱藏牌靴明細":"查看符合的牌靴明細";
 }
 
 function isModalOpen(id){
@@ -1219,7 +1413,14 @@ $("newShoeButton").onclick=openShoeModal;$("finishShoeButton").onclick=finishCur
 $("myRecentShoesButton").onclick=openMyRecentShoes;$("closeMyRecentShoesModal").onclick=closeMyRecentShoes;document.querySelector("[data-close-my-recent-shoes]").onclick=closeMyRecentShoes;
 $("manageShoesButton").onclick=openShoeManager;$("closeManagerModal").onclick=closeManagerModal;document.querySelector("[data-close-manager]").onclick=closeManagerModal;$("shoeSearchInput").oninput=renderShoeManager;$("shoeStatusFilter").onchange=renderShoeManager;
 $("closeDetailModal").onclick=closeDetailModal;document.querySelector("[data-close-detail]").onclick=closeDetailModal;$("closeEditModal").onclick=closeEditModal;$("cancelEditShoeButton").onclick=closeEditModal;document.querySelector("[data-close-edit]").onclick=closeEditModal;$("saveEditShoeButton").onclick=saveEditedShoe;
-$("dashboardButton").onclick=openDashboard;$("closeDashboardModal").onclick=closeDashboard;document.querySelector("[data-close-dashboard]").onclick=closeDashboard;$("refreshDashboardButton").onclick=()=>loadDashboard();$("dashboardShoeSearchButton").onclick=searchDashboardShoes;$("dashboardShoeSearchInput").addEventListener("keydown",e=>{if(e.key==="Enter")searchDashboardShoes()});
+$("dashboardButton").onclick=openDashboard;
+$("closeDashboardModal").onclick=closeDashboard;
+document.querySelector("[data-close-dashboard]").onclick=closeDashboard;
+$("refreshDashboardButton").onclick=()=>loadDashboard();
+$("dashboardRecordSearchButton").onclick=searchDashboardRecords;
+$("dashboardRecordResetButton").onclick=resetDashboardRecordSearch;
+$("closeDashboardSearchResults").onclick=closeDashboardSearchResultsPanel;
+$("toggleRecordSearchDetails").onclick=toggleRecordSearchDetails;
 document.querySelectorAll("[data-dashboard-view]").forEach(b=>b.onclick=()=>openManagementList(b.dataset.dashboardView));$("closeManagementListModal").onclick=closeManagementList;document.querySelector("[data-close-management-list]").onclick=closeManagementList;$("managementListSearch").addEventListener("input",renderManagementList);
 $("openFinishedHistoryButton").onclick=openFinishedHistory;$("closeFinishedHistoryModal").onclick=closeFinishedHistory;document.querySelector("[data-close-finished-history]").onclick=closeFinishedHistory;$("finishedHistorySearch").addEventListener("input",renderFinishedHistory);
 $("closePersonnelStatsModal").onclick=closePersonnelStats;document.querySelector("[data-close-personnel-stats]").onclick=closePersonnelStats;$("personnelSearch").addEventListener("input",renderPersonnelStats);$("dashboardPersonnelSearch").addEventListener("input",()=>renderPersonnelInto("dashboardPersonnelList","dashboardPersonnelCount","dashboardPersonnelSearch"));
