@@ -92,7 +92,7 @@ window.addEventListener("load",()=>{
 
 setTimeout(forceFinishBrandIntro,BRAND_INTRO_FAILSAFE_MS);
 
-const APP_BUILD="17.3";
+const APP_BUILD="17.3.1";
 console.info("HawkVision Record Studio build",APP_BUILD);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
@@ -151,6 +151,8 @@ let correctionGames=[];
 let correctionLockToken=null;
 let correctionEditingGame=null;
 let correctionEditorMode="update";
+let correctionInputMode="full";
+let correctionWinnerOnlyValue=null;
 let correctionCardState={player:[null,null,null],banker:[null,null,null]};
 let correctionSelectedSlot={side:"player",index:0};
 let correctionLockHeartbeat=null;
@@ -589,10 +591,24 @@ function correctionDerived(){
   };
 }
 function correctionPayload(){
+  if(correctionInputMode==="winner_only"){
+    if(!["莊","閒","和"].includes(correctionWinnerOnlyValue))return null;
+    return {
+      winner:correctionWinnerOnlyValue,
+      input_method:"winner_only_correction",
+      banker_points:null,player_points:null,difference:null,
+      banker_pair:false,player_pair:false,
+      banker_card_count:null,player_card_count:null,
+      banker_natural:false,player_natural:false,super_six:false,
+      player_card_1:null,player_card_2:null,player_card_3:null,
+      banker_card_1:null,banker_card_2:null,banker_card_3:null
+    };
+  }
   const d=correctionDerived();
   if(!d)return null;
   return {
     ...d,
+    input_method:"manual_correction",
     difference:d.banker_points-d.player_points,
     player_card_1:correctionCardState.player[0],
     player_card_2:correctionCardState.player[1],
@@ -609,7 +625,30 @@ function correctionSlotButton(side,index,label){
     <small>${label}</small><strong>${rank||"＋"}</strong>
   </button>`;
 }
+function setCorrectionInputMode(mode){
+  correctionInputMode=mode;
+  $("correctionFullModeButton").classList.toggle("active",mode==="full");
+  $("correctionWinnerOnlyModeButton").classList.toggle("active",mode==="winner_only");
+  $("correctionWinnerOnlyPanel").classList.toggle("hidden",mode!=="winner_only");
+  $("correctionEditorBoard").classList.toggle("hidden",mode==="winner_only");
+  $("correctionRankPalette").classList.toggle("hidden",mode==="winner_only");
+  renderCorrectionEditor();
+}
 function renderCorrectionEditor(){
+  if(correctionInputMode==="winner_only"){
+    document.querySelectorAll("[data-correction-winner]").forEach(b=>{
+      b.classList.toggle("selected",b.dataset.correctionWinner===correctionWinnerOnlyValue);
+      b.onclick=()=>{
+        correctionWinnerOnlyValue=b.dataset.correctionWinner;
+        renderCorrectionEditor();
+      };
+    });
+    $("correctionDerivedSummary").className=`correction-derived-summary ${correctionWinnerOnlyValue?"valid":"invalid"}`;
+    $("correctionDerivedSummary").innerHTML=correctionWinnerOnlyValue
+      ?`<strong>${correctionWinnerOnlyValue==="和"?"和局":`${correctionWinnerOnlyValue}贏`}</strong><span>只記勝方模式，不保存牌面與點數</span>`
+      :`<strong>尚未完成</strong><span>請選擇莊、閒或和</span>`;
+    return;
+  }
   $("correctionEditorBoard").innerHTML=`
     <div class="correction-hand-panel player">
       <h3>閒家</h3>
@@ -724,6 +763,8 @@ function openGameCorrectionEditor(modeName,game=null){
   correctionEditorMode=modeName;
   correctionEditingGame=game;
   correctionSelectedSlot={side:"player",index:0};
+  correctionInputMode=(game && !game.player_card_1 && !game.banker_card_1)?"winner_only":"full";
+  correctionWinnerOnlyValue=game?.winner||null;
   if(game){
     correctionCardState={
       player:[game.player_card_1||null,game.player_card_2||null,game.player_card_3||null],
@@ -738,6 +779,11 @@ function openGameCorrectionEditor(modeName,game=null){
   setTextSafe("gameCorrectionEditorMeta",modeName==="insert"?"選擇插入位置並輸入完整牌面":"原牌面已帶入，可改成四張、五張或六張");
   $("gameCorrectionEditorMessage").textContent="";
   $("gameCorrectionEditorModal").classList.remove("hidden");
+  $("correctionFullModeButton").classList.toggle("active",correctionInputMode==="full");
+  $("correctionWinnerOnlyModeButton").classList.toggle("active",correctionInputMode==="winner_only");
+  $("correctionWinnerOnlyPanel").classList.toggle("hidden",correctionInputMode!=="winner_only");
+  $("correctionEditorBoard").classList.toggle("hidden",correctionInputMode==="winner_only");
+  $("correctionRankPalette").classList.toggle("hidden",correctionInputMode==="winner_only");
   renderCorrectionEditor();
 }
 function closeGameCorrectionEditor(){
@@ -745,7 +791,10 @@ function closeGameCorrectionEditor(){
 }
 async function saveGameCorrection(){
   const payload=correctionPayload();
-  if(!payload)return showMessage($("gameCorrectionEditorMessage"),correctionProgress().message,"error");
+  if(!payload){
+    const message=correctionInputMode==="winner_only"?"請先選擇莊、閒或和":correctionProgress().message;
+    return showMessage($("gameCorrectionEditorMessage"),message,"error");
+  }
   const position=correctionEditorMode==="insert"?Number($("correctionInsertPosition").value):Number(correctionEditingGame?.game_number);
   if(!Number.isInteger(position)||position<1||position>correctionGames.length+1)return showMessage($("gameCorrectionEditorMessage"),"插入位置不正確","error");
   if(!confirm("你即將修正已完成牌靴。\n\n儲存後會更新統計、全歷史分析索引與搜尋結果，並永久保留人工修正記錄。"))return;
@@ -2102,6 +2151,8 @@ $("closeGameCorrectionEditorModal").onclick=closeGameCorrectionEditor;
 document.querySelector("[data-close-game-correction-editor]").onclick=closeGameCorrectionEditor;
 $("cancelGameCorrectionButton").onclick=closeGameCorrectionEditor;
 $("saveGameCorrectionButton").onclick=saveGameCorrection;
+$("correctionFullModeButton").onclick=()=>setCorrectionInputMode("full");
+$("correctionWinnerOnlyModeButton").onclick=()=>setCorrectionInputMode("winner_only");
 $("closeCorrectionHistoryModal").onclick=closeCorrectionHistory;
 document.querySelector("[data-close-correction-history]").onclick=closeCorrectionHistory;
 

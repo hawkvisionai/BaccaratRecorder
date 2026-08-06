@@ -982,3 +982,52 @@ body:not(.brand-intro-active) .container{
   .correction-derived-summary{align-items:flex-start;flex-direction:column}
   .correction-lock-state{margin-left:0;width:100%}
 }
+
+
+/* v17.3.1｜修正牌靴加入只記勝方 */
+.correction-mode-switch{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin:12px 0;
+}
+.correction-mode-switch .mode-button{
+  border:1px solid var(--line);
+  background:var(--card2);
+  color:var(--muted);
+}
+.correction-mode-switch .mode-button.active{
+  color:var(--text);
+  border-color:rgba(96,165,250,.65);
+  background:rgba(30,64,175,.22);
+}
+.correction-winner-only-panel{
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:var(--card2);
+  margin-bottom:12px;
+}
+.correction-winner-only-panel p{
+  margin:0 0 10px;
+  color:var(--muted);
+  font-weight:800;
+}
+.correction-winner-buttons{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+}
+.correction-winner-buttons button{
+  min-height:64px;
+  font-size:20px;
+  font-weight:950;
+  border:2px solid transparent;
+}
+.correction-winner-buttons button.selected{
+  outline:3px solid rgba(255,255,255,.5);
+  outline-offset:2px;
+}
+@media(max-width:600px){
+  .correction-mode-switch{grid-template-columns:1fr}
+}

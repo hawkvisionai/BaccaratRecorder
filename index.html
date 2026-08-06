@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="favicon.png?v=1" />
   <link rel="shortcut icon" href="favicon.ico?v=1" />
   <link rel="apple-touch-icon" href="hawkvision-app-icon.png?v=1" />
-  <link rel="stylesheet" href="style.css?v=17.3" />
+  <link rel="stylesheet" href="style.css?v=17.3.1" />
 </head>
 <body class="brand-intro-active">
   <div id="brandIntro" class="brand-intro" aria-label="HawkVision 品牌開場">
@@ -207,6 +207,20 @@
         <input id="correctionInsertPosition" type="number" min="1" inputmode="numeric" />
         <small>例如輸入 29，會插入為第 29 局，原第 29 局起自動順延。</small>
       </label>
+
+      <div class="correction-mode-switch" role="group" aria-label="修正輸入模式">
+        <button id="correctionFullModeButton" class="mode-button active" type="button">完整牌面</button>
+        <button id="correctionWinnerOnlyModeButton" class="mode-button" type="button">只記勝方</button>
+      </div>
+
+      <div id="correctionWinnerOnlyPanel" class="correction-winner-only-panel hidden">
+        <p>選擇這一局的結果</p>
+        <div class="correction-winner-buttons">
+          <button type="button" class="banker" data-correction-winner="莊">莊</button>
+          <button type="button" class="player" data-correction-winner="閒">閒</button>
+          <button type="button" class="tie" data-correction-winner="和">和</button>
+        </div>
+      </div>
 
       <div id="correctionEditorBoard" class="correction-editor-board"></div>
       <div id="correctionRankPalette" class="correction-rank-palette"></div>
@@ -555,6 +569,6 @@
       </div>
     </div>
   </div>
-<script type="module" src="app.js?v=17.3"></script>
+<script type="module" src="app.js?v=17.3.1"></script>
 </body>
 </html>
