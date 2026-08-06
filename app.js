@@ -92,7 +92,7 @@ window.addEventListener("load",()=>{
 
 setTimeout(forceFinishBrandIntro,BRAND_INTRO_FAILSAFE_MS);
 
-const APP_BUILD="17.1.1";
+const APP_BUILD="17.1.2";
 console.info("HawkVision Record Studio build",APP_BUILD);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
@@ -670,6 +670,7 @@ async function openDashboard(){
   if(!isManager())return;
   $("dashboardModal").classList.remove("hidden");
   $("dashboardMessage").textContent="";
+  if($("usePersonnelWorkday"))$("usePersonnelWorkday").checked=true;
   await Promise.all([loadDashboard(), loadRecordSearchOptions()]);
 }
 function scheduleDashboardReload(){
@@ -864,6 +865,11 @@ function toLocalDateTimeValue(date){
   return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function normalizeWorkdayTime(value){
+  const match=String(value||"00:00").match(/^(\d{1,2}):(\d{2})/);
+  if(!match)return "00:00";
+  return `${String(Math.min(23,Number(match[1])||0)).padStart(2,"0")}:${match[2]}`;
+}
 function setRecordSearchDates(start,end){
   $("dashboardRecordStart").value=start?toLocalDateTimeValue(start):"";
   $("dashboardRecordEnd").value=end?toLocalDateTimeValue(end):"";
@@ -884,28 +890,30 @@ function applyRecordRange(type){
   setRecordSearchDates(start,end);
 }
 function applySelectedPersonnelWorkday(){
-  if(!$("usePersonnelWorkday")?.checked)return;
+  const checkbox=$("usePersonnelWorkday");
+  if(checkbox)checkbox.checked=true;
   const option=$("dashboardRecordPersonnel").selectedOptions[0];
-  const startTime=option?.dataset?.workday;
-  if(!option?.value||!startTime)return;
+  if(!option?.value)return;
+  const startTime=normalizeWorkdayTime(option.dataset.workday);
   const baseValue=$("dashboardRecordStart").value;
   const base=baseValue?new Date(baseValue):new Date();
   const [h,m]=startTime.split(":").map(Number);
-  const start=new Date(base);start.setHours(h||0,m||0,0,0);
+  const start=new Date(base);start.setHours(h,m,0,0);
   const end=new Date(start);end.setDate(end.getDate()+1);end.setMilliseconds(end.getMilliseconds()-1);
   setRecordSearchDates(start,end);
+  showMessage($("dashboardMessage"),`已套用 ${option.textContent.replace("（已停用）","")} 的一日範圍：${startTime} ～隔日 ${startTime}`,"info");
 }
 
 async function loadRecordSearchOptions(){
   const venueSelect=$("dashboardRecordVenue");
   const personnelSelect=$("dashboardRecordPersonnel");
   try{
-    const [venuesR,profilesR]=await Promise.all([
-      supabase.from("shoes").select("venue").not("venue","is",null),
-      supabase.from("profiles").select("id,display_name,username,email,is_active,workday_start").order("display_name",{ascending:true})
-    ]);
+    const venuesR=await supabase.from("shoes").select("venue").not("venue","is",null);
     if(venuesR.error)throw venuesR.error;
-    if(profilesR.error)throw profilesR.error;
+
+    // 管理者直接透過 manage-users 讀取，確保拿到剛儲存的最新 workday_start。
+    const userResult=await callUserAdmin("list");
+    const profileRows=userResult.users||[];
 
     const currentVenue=venueSelect.value;
     const currentPersonnel=personnelSelect.value;
@@ -914,16 +922,18 @@ async function loadRecordSearchOptions(){
     if(venues.includes(currentVenue))venueSelect.value=currentVenue;
 
     const includeInactive=$("includeInactivePersonnel")?.checked===true;
-    const people=(profilesR.data||[]).filter(p=>includeInactive||p.is_active!==false).map(p=>({
+    const people=profileRows.filter(p=>includeInactive||p.is_active!==false).map(p=>({
       id:p.id,
       label:p.display_name||p.username||p.email||"未命名人員",
       active:p.is_active!==false,
-      workday:p.workday_start||"00:00"
+      workday:normalizeWorkdayTime(p.workday_start)
     })).sort((a,b)=>a.label.localeCompare(b.label,"zh-Hant"));
+
     personnelSelect.innerHTML='<option value="">全部人員</option>'+people.map(p=>`<option value="${escapeHtml(p.id)}" data-workday="${escapeHtml(p.workday)}">${escapeHtml(p.label)}${p.active?"":"（已停用）"}</option>`).join("");
     if(people.some(p=>String(p.id)===String(currentPersonnel)))personnelSelect.value=currentPersonnel;
 
     if(!$("dashboardRecordStart").value&&!$("dashboardRecordEnd").value)defaultRecordSearchRange();
+    if(personnelSelect.value)applySelectedPersonnelWorkday();
   }catch(e){
     showMessage($("dashboardMessage"),e.message||"讀取搜尋條件失敗","error");
   }
@@ -1500,7 +1510,7 @@ function userManagerCard(u){
     <span class="role-badge ${owner||coadmin?"admin":"recorder"}">${roleLabel(u.role)}</span>
     <span class="account-state ${active?"active":"disabled"}">${active?"啟用":"停用"}</span>
     <label class="workday-setting">一日開始
-      <input type="time" data-user-workday="${u.id}" value="${escapeHtml((u.workday_start||"00:00").slice(0,5))}" ${canManage?"":"disabled"} />
+      <input type="time" data-user-workday="${u.id}" value="${escapeHtml(normalizeWorkdayTime(u.workday_start))}" ${canManage?"":"disabled"} />
     </label>
     <div class="ai-permission"><span>AI 辨識</span><i class="permission-light ${ai?"on":"off"}"></i></div>
     <div class="user-actions">
@@ -1533,6 +1543,9 @@ function renderManagedUsers(){
 }
 function bindManagedUserActions(){
   document.querySelectorAll("[data-user-action]").forEach(b=>b.onclick=()=>handleManagedUserAction(b.dataset.userAction,b.dataset.id));
+  document.querySelectorAll("[data-user-workday]").forEach(input=>{
+    input.onchange=()=>handleManagedUserAction("save_workday",input.dataset.userWorkday);
+  });
 }
 function renderInactiveUsers(){
   const list=$("inactiveUsersList");if(!list)return;
@@ -1554,8 +1567,29 @@ async function handleManagedUserAction(action,id){
   const user=managedUsers.find(u=>u.id===id);if(!user||user.role==="admin"||user.id===currentUser?.id)return;
   if(action==="save_workday"){
     const input=document.querySelector(`[data-user-workday="${id}"]`);
-    const workday_start=input?.value||"00:00";
-    setBusy(true);try{await callUserAdmin("set_workday",{user_id:id,workday_start});showSaveToast("✓ 一日開始時間已更新");await loadManagedUsers()}catch(e){showMessage($("userManagerMessage"),e.message||"時間更新失敗","error")}finally{setBusy(false)}
+    const workday_start=normalizeWorkdayTime(input?.value);
+    setBusy(true);
+    try{
+      await callUserAdmin("set_workday",{user_id:id,workday_start});
+
+      // 立即從後端回讀確認，不再只依賴畫面暫存值。
+      const verify=await callUserAdmin("list");
+      managedUsers=verify.users||[];
+      const saved=managedUsers.find(x=>String(x.id)===String(id));
+      if(normalizeWorkdayTime(saved?.workday_start)!==workday_start){
+        throw new Error("後端未回傳剛儲存的時間，請重新操作");
+      }
+
+      const searchOption=[...$("dashboardRecordPersonnel")?.options||[]].find(o=>String(o.value)===String(id));
+      if(searchOption)searchOption.dataset.workday=workday_start;
+
+      showSaveToast(`✓ 一日開始時間已儲存：${workday_start}`);
+      renderManagedUsers();
+    }catch(e){
+      showMessage($("userManagerMessage"),e.message||"時間更新失敗","error");
+    }finally{
+      setBusy(false);
+    }
   }
   if(action==="role"){
     if(!isOwnerAdmin())return;

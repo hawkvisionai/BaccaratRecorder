@@ -813,3 +813,10 @@ body:not(.brand-intro-active) .container{
     min-width:0;
   }
 }
+
+
+/* v17.1.2｜一日開始時間儲存與搜尋同步 */
+.workday-setting input[type="time"]:focus{
+  outline:2px solid rgba(96,165,250,.55);
+  outline-offset:2px;
+}
