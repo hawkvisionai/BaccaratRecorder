@@ -92,7 +92,7 @@ window.addEventListener("load",()=>{
 
 setTimeout(forceFinishBrandIntro,BRAND_INTRO_FAILSAFE_MS);
 
-const APP_BUILD="17.0";
+const APP_BUILD="17.1";
 console.info("HawkVision Record Studio build",APP_BUILD);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
@@ -185,7 +185,9 @@ function freshAiCapture(){
     diagnostics:null, reviewRequired:false
   };
 }
-function aiAllowed(){ return currentProfile?.role==="admin" || currentProfile?.ai_capture_enabled===true; }
+function isOwnerAdmin(){ return currentProfile?.role==="admin"; }
+function isManager(){ return currentProfile?.role==="admin" || currentProfile?.role==="coadmin"; }
+function aiAllowed(){ return isManager() || currentProfile?.ai_capture_enabled===true; }
 function releaseAiPhoto(){
   if(aiCapture.objectUrl) URL.revokeObjectURL(aiCapture.objectUrl);
   aiCapture=freshAiCapture();
@@ -665,18 +667,18 @@ function closeDashboard(){
   $("dashboardModal").classList.add("hidden");
 }
 async function openDashboard(){
-  if(currentProfile?.role!=="admin")return;
+  if(!isManager())return;
   $("dashboardModal").classList.remove("hidden");
   $("dashboardMessage").textContent="";
   await Promise.all([loadDashboard(), loadRecordSearchOptions()]);
 }
 function scheduleDashboardReload(){
-  if(currentProfile?.role!=="admin"||!isModalOpen("dashboardModal"))return;
+  if(!isManager()||!isModalOpen("dashboardModal"))return;
   clearTimeout(dashboardRefreshTimer);
   dashboardRefreshTimer=setTimeout(()=>loadDashboard(true),350);
 }
 async function loadDashboard(silent=false){
-  if(currentProfile?.role!=="admin")return;
+  if(!isManager())return;
   if(!silent){
     $("dashboardActiveShoes").innerHTML='<p class="empty">讀取中…</p>';
     $("dashboardFinishedShoes").innerHTML='<p class="empty">讀取中…</p>';
@@ -799,7 +801,7 @@ async function attachAdminShoeDetails(shoes){
   return shoes.map(s=>({...s,owner_name:ownerMap.get(String(s.owner_id))||"未指定",count:gameMap.get(String(s.id))||0}));
 }
 async function openFinishedHistory(){
-  if(currentProfile?.role!=="admin")return;
+  if(!isManager())return;
   $("finishedHistoryModal").classList.remove("hidden");$("finishedHistoryMessage").textContent="";$("finishedHistoryList").innerHTML='<p class="empty">讀取中…</p>';
   try{const r=await supabase.from("shoes").select("id,shoe_number,name,venue,status,owner_id,created_at,recording_started_at,finished_at,is_archived").not("finished_at","is",null).eq("is_archived",false).order("finished_at",{ascending:false}).limit(50);if(r.error)throw r.error;finishedHistoryData=await attachAdminShoeDetails(r.data||[]);renderFinishedHistory();}
   catch(e){showMessage($("finishedHistoryMessage"),e.message||"讀取最近完成牌靴失敗","error");$("finishedHistoryList").innerHTML='<p class="empty">讀取失敗</p>';}
@@ -835,13 +837,13 @@ function renderPersonnelInto(listId,countId,searchId){
   list.querySelectorAll("[data-person-id]").forEach(b=>b.onclick=()=>openPersonnelDetail(b.dataset.personId));
 }
 async function loadPersonnelStatsInline(){
-  if(currentProfile?.role!=="admin")return;
+  if(!isManager())return;
   $("dashboardPersonnelMessage").textContent="";
   try{await loadPersonnelStatsData();renderPersonnelInto("dashboardPersonnelList","dashboardPersonnelCount","dashboardPersonnelSearch");}
   catch(e){showMessage($("dashboardPersonnelMessage"),e.message||"讀取人員統計失敗","error");$("dashboardPersonnelList").innerHTML='<p class="empty">讀取失敗</p>';}
 }
 async function openPersonnelStats(){
-  if(currentProfile?.role!=="admin")return;
+  if(!isManager())return;
   $("personnelStatsModal").classList.remove("hidden");$("personnelStatsMessage").textContent="";$("personnelStatsList").innerHTML='<p class="empty">讀取中…</p>';
   try{await loadPersonnelStatsData();renderPersonnelStats();}
   catch(e){showMessage($("personnelStatsMessage"),e.message||"讀取人員統計失敗","error");$("personnelStatsList").innerHTML='<p class="empty">讀取失敗</p>';}
@@ -849,7 +851,7 @@ async function openPersonnelStats(){
 function renderPersonnelStats(){renderPersonnelInto("personnelStatsList","personnelCount","personnelSearch");}
 
 async function openPersonnelDetail(personId){
-  if(currentProfile?.role!=="admin")return;
+  if(!isManager())return;
   selectedPersonnel=personnelStatsData.find(p=>String(p.id)===String(personId));if(!selectedPersonnel)return;
   $("personnelDetailModal").classList.remove("hidden");$("personnelDetailTitle").textContent=selectedPersonnel.display_name||selectedPersonnel.username||"人員牌靴細項";$("personnelDetailMeta").textContent=`${selectedPersonnel.username||selectedPersonnel.email||""}｜最近完成牌靴`;$("personnelDetailList").innerHTML='<p class="empty">讀取中…</p>';
   $("personnelDetailSummary").innerHTML=`<div><b>${selectedPersonnel.last7}</b><small>最近 7 天</small></div><div><b>${selectedPersonnel.last30}</b><small>最近 30 天</small></div><div><b>${selectedPersonnel.total}</b><small>累計完成</small></div>`;
@@ -862,13 +864,36 @@ function toLocalDateTimeValue(date){
   return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+function setRecordSearchDates(start,end){
+  $("dashboardRecordStart").value=start?toLocalDateTimeValue(start):"";
+  $("dashboardRecordEnd").value=end?toLocalDateTimeValue(end):"";
+}
 function defaultRecordSearchRange(){
   const end=new Date();
-  const start=new Date(end);
-  start.setDate(start.getDate()-7);
-  start.setHours(0,0,0,0);
-  $("dashboardRecordStart").value=toLocalDateTimeValue(start);
-  $("dashboardRecordEnd").value=toLocalDateTimeValue(end);
+  const start=new Date(end);start.setHours(0,0,0,0);
+  setRecordSearchDates(start,end);
+}
+function applyRecordRange(type){
+  const now=new Date(),start=new Date(now),end=new Date(now);
+  if(type==="today"){start.setHours(0,0,0,0)}
+  if(type==="yesterday"){start.setDate(start.getDate()-1);start.setHours(0,0,0,0);end.setDate(end.getDate()-1);end.setHours(23,59,59,999)}
+  if(type==="week"){const day=(start.getDay()+6)%7;start.setDate(start.getDate()-day);start.setHours(0,0,0,0)}
+  if(type==="month"){start.setDate(1);start.setHours(0,0,0,0)}
+  if(type==="last-month"){start.setMonth(start.getMonth()-1,1);start.setHours(0,0,0,0);end.setDate(0);end.setHours(23,59,59,999)}
+  if(type==="all"){setRecordSearchDates(null,now);return}
+  setRecordSearchDates(start,end);
+}
+function applySelectedPersonnelWorkday(){
+  if(!$("usePersonnelWorkday")?.checked)return;
+  const option=$("dashboardRecordPersonnel").selectedOptions[0];
+  const startTime=option?.dataset?.workday;
+  if(!option?.value||!startTime)return;
+  const baseValue=$("dashboardRecordStart").value;
+  const base=baseValue?new Date(baseValue):new Date();
+  const [h,m]=startTime.split(":").map(Number);
+  const start=new Date(base);start.setHours(h||0,m||0,0,0);
+  const end=new Date(start);end.setDate(end.getDate()+1);end.setMilliseconds(end.getMilliseconds()-1);
+  setRecordSearchDates(start,end);
 }
 
 async function loadRecordSearchOptions(){
@@ -877,7 +902,7 @@ async function loadRecordSearchOptions(){
   try{
     const [venuesR,profilesR]=await Promise.all([
       supabase.from("shoes").select("venue").not("venue","is",null),
-      supabase.from("profiles").select("id,display_name,username,email").order("display_name",{ascending:true})
+      supabase.from("profiles").select("id,display_name,username,email,is_active,workday_start").order("display_name",{ascending:true})
     ]);
     if(venuesR.error)throw venuesR.error;
     if(profilesR.error)throw profilesR.error;
@@ -888,11 +913,14 @@ async function loadRecordSearchOptions(){
     venueSelect.innerHTML='<option value="">全部場館</option>'+venues.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
     if(venues.includes(currentVenue))venueSelect.value=currentVenue;
 
-    const people=(profilesR.data||[]).map(p=>({
+    const includeInactive=$("includeInactivePersonnel")?.checked===true;
+    const people=(profilesR.data||[]).filter(p=>includeInactive||p.is_active!==false).map(p=>({
       id:p.id,
-      label:p.display_name||p.username||p.email||"未命名人員"
+      label:p.display_name||p.username||p.email||"未命名人員",
+      active:p.is_active!==false,
+      workday:p.workday_start||"00:00"
     })).sort((a,b)=>a.label.localeCompare(b.label,"zh-Hant"));
-    personnelSelect.innerHTML='<option value="">全部人員</option>'+people.map(p=>`<option value="${escapeHtml(p.id)}">${escapeHtml(p.label)}</option>`).join("");
+    personnelSelect.innerHTML='<option value="">全部人員</option>'+people.map(p=>`<option value="${escapeHtml(p.id)}" data-workday="${escapeHtml(p.workday)}">${escapeHtml(p.label)}${p.active?"":"（已停用）"}</option>`).join("");
     if(people.some(p=>String(p.id)===String(currentPersonnel)))personnelSelect.value=currentPersonnel;
 
     if(!$("dashboardRecordStart").value&&!$("dashboardRecordEnd").value)defaultRecordSearchRange();
@@ -1012,11 +1040,11 @@ function renderRecordSearchResults(rows,start,end){
 async function searchDashboardRecords(){
   const startValue=$("dashboardRecordStart").value;
   const endValue=$("dashboardRecordEnd").value;
-  if(!startValue||!endValue){
-    return showMessage($("dashboardMessage"),"請完整選擇開始時間與結束時間","error");
+  if(!endValue){
+    return showMessage($("dashboardMessage"),"請選擇結束時間","error");
   }
 
-  const start=new Date(startValue);
+  const start=startValue?new Date(startValue):new Date("2000-01-01T00:00:00");
   const end=new Date(endValue);
   if(Number.isNaN(start.getTime())||Number.isNaN(end.getTime())){
     return showMessage($("dashboardMessage"),"時間格式不正確","error");
@@ -1133,7 +1161,7 @@ function scheduleRealtimeReload(reason="資料更新"){
   },220);
 }
 function scheduleManagerReload(kind){
-  if(currentProfile?.role!=="admin")return;
+  if(!isManager())return;
   clearTimeout(realtimeManagerTimer);
   realtimeManagerTimer=setTimeout(async()=>{
     try{
@@ -1182,7 +1210,7 @@ async function startRealtime(){
     })
     .subscribe(status=>updateRealtimeConnection(status,generation));
 
-  const profileFilter=currentProfile?.role==="admin"?undefined:`id=eq.${currentUser.id}`;
+  const profileFilter=isManager()?undefined:`id=eq.${currentUser.id}`;
   const profileConfig={event:"*",schema:"public",table:"profiles"};
   if(profileFilter)profileConfig.filter=profileFilter;
   const profileChannel=supabase.channel(`studio-profiles-${currentUser.id}-${generation}`)
@@ -1225,29 +1253,29 @@ async function login(){
 }
 async function logout(){await supabase.auth.signOut()}
 async function loadCurrentProfile(user){
-  const {data,error}=await supabase.from("profiles").select("id,email,username,display_name,role,is_active,ai_capture_enabled").eq("id",user.id).maybeSingle();
+  const {data,error}=await supabase.from("profiles").select("id,email,username,display_name,role,is_active,ai_capture_enabled,workday_start").eq("id",user.id).maybeSingle();
   if(error) throw error;
   if(!data) throw new Error("找不到使用者資料，請先執行 v16.1.0 資料庫升級 SQL");
   if(data.is_active===false){await supabase.auth.signOut();throw new Error("此帳號已被停用，請聯絡管理員");}
   return data;
 }
 function applyRoleUI(){
-  const isAdmin=currentProfile?.role==="admin";
+  const manager=isManager(),owner=isOwnerAdmin();
   $("userDisplayName").textContent=currentProfile?.display_name||currentProfile?.email||"使用者";
-  $("userRoleBadge").textContent=isAdmin?"管理員":"記錄員";
-  $("userRoleBadge").className=`role-badge ${isAdmin?"admin":"recorder"}`;
-  $("manageShoesButton").classList.toggle("hidden",!isAdmin);
-  $("userManagerButton").classList.toggle("hidden",!isAdmin);
-  $("dashboardButton").classList.toggle("hidden",!isAdmin);
+  $("userRoleBadge").textContent=owner?"最高管理員":currentProfile?.role==="coadmin"?"共同管理員":"記錄員";
+  $("userRoleBadge").className=`role-badge ${manager?"admin":"recorder"}`;
+  $("manageShoesButton").classList.toggle("hidden",!manager);
+  $("userManagerButton").classList.toggle("hidden",!manager);
+  $("dashboardButton").classList.toggle("hidden",!manager);
   const allowAi=aiAllowed();
   $("aiInputMethod").classList.toggle("hidden",!allowAi);
   if(!allowAi&&inputMethod==="ai")setInputMethod("manual");
-  if(!isAdmin && !document.getElementById("recorderNotice")){
+  if(!manager && !document.getElementById("recorderNotice")){
     const note=document.createElement("div");note.id="recorderNotice";note.className="recorder-note";
     note.textContent="記錄員模式：可建立與記錄牌靴；牌靴管理功能僅限管理員。";
     $("appMessage").insertAdjacentElement("afterend",note);
   }
-  if(isAdmin) document.getElementById("recorderNotice")?.remove();
+  if(manager) document.getElementById("recorderNotice")?.remove();
 }
 async function showAuthenticated(session){
   currentUser=session.user;
@@ -1445,7 +1473,7 @@ async function callUserAdmin(action,payload={}){
 }
 function closeUserManager(){if(!busy)$("userManagerModal").classList.add("hidden")}
 async function openUserManager(){
-  if(currentProfile?.role!=="admin")return;
+  if(!isManager())return;
   $("userManagerModal").classList.remove("hidden");
   $("userManagerMessage").textContent="";
   await loadManagedUsers();
@@ -1455,13 +1483,65 @@ async function loadManagedUsers(){
   try{const result=await callUserAdmin("list");managedUsers=result.users||[];renderManagedUsers()}
   catch(e){$("userManagerList").innerHTML='<p class="empty">讀取失敗</p>';showMessage($("userManagerMessage"),e.message||"讀取人員失敗","error")}
 }
+function roleLabel(role){
+  return role==="admin"?"最高管理員":role==="coadmin"?"共同管理員":"記錄員";
+}
+function userManagerCard(u){
+  const owner=u.role==="admin",coadmin=u.role==="coadmin",self=u.id===currentUser?.id,active=u.is_active!==false;
+  const online=isOnlineUser(u.id),presence=onlineProfiles.get(String(u.id));
+  const onlineAt=presence?.online_at?formatDate(presence.online_at):"";
+  const ai=owner||coadmin||u.ai_capture_enabled===true;
+  const canManage=!owner&&!self;
+  return `<div class="user-manager-row ${online?"online-user-row":""}">
+    <div class="user-main-cell">
+      <strong><span class="presence-dot ${online?"online":"offline"}"></span>${escapeHtml(u.display_name||u.email)}</strong>
+      <small>${escapeHtml(u.username||u.email)}｜${online?`上線：${escapeHtml(onlineAt)}`:"目前離線"}</small>
+    </div>
+    <span class="role-badge ${owner||coadmin?"admin":"recorder"}">${roleLabel(u.role)}</span>
+    <span class="account-state ${active?"active":"disabled"}">${active?"啟用":"停用"}</span>
+    <label class="workday-setting">一日開始
+      <input type="time" data-user-workday="${u.id}" value="${escapeHtml((u.workday_start||"00:00").slice(0,5))}" ${canManage?"":"disabled"} />
+    </label>
+    <div class="ai-permission"><span>AI 辨識</span><i class="permission-light ${ai?"on":"off"}"></i></div>
+    <div class="user-actions">
+      ${canManage?`<button class="secondary" data-user-action="save_workday" data-id="${u.id}">儲存時間</button>
+      <button class="secondary" data-user-action="password" data-id="${u.id}">重設密碼</button>
+      <button class="danger" data-user-action="active" data-id="${u.id}">停用</button>
+      <button class="secondary" data-user-action="ai" data-id="${u.id}">切換 AI</button>
+      ${isOwnerAdmin()?`<button class="warning" data-user-action="role" data-id="${u.id}">${coadmin?"取消共同管理":"設為共同管理員"}</button>`:""}
+      <button class="delete-user" data-user-action="delete" data-id="${u.id}">刪除人員</button>`:""}
+      ${self?'<span class="self-label">目前帳號</span>':""}
+    </div>
+  </div>`;
+}
 function renderManagedUsers(){
-  $("userManagerList").innerHTML=managedUsers.length?managedUsers.map(u=>{
-    const admin=u.role==="admin",self=u.id===currentUser?.id,active=u.is_active!==false,ai=admin||u.ai_capture_enabled===true;
-    const online=isOnlineUser(u.id);return `<div class="user-manager-row"><div><strong><span class="presence-dot ${online?"online":"offline"}"></span>${escapeHtml(u.display_name||u.email)}</strong><small>${escapeHtml(u.username||u.email)}｜${online?"目前在線":"目前離線"}</small></div><span class="role-badge ${admin?"admin":"recorder"}">${admin?"管理員":"記錄員"}</span><span class="account-state ${active?"active":"disabled"}">${active?"啟用":"停用"}</span><div class="ai-permission"><span>AI 辨識</span><i class="permission-light ${ai?"on":"off"}" aria-label="${ai?"可使用":"不可使用"}"></i></div><div class="user-actions">${admin?"":`<button class="secondary" data-user-action="password" data-id="${u.id}">重設密碼</button><button class="${active?"danger":"success"}" data-user-action="active" data-id="${u.id}">${active?"停用":"啟用"}</button><button class="secondary" data-user-action="ai" data-id="${u.id}">切換 AI</button><button class="delete-user" data-user-action="delete" data-id="${u.id}">刪除人員</button>`}${self?'<span class="self-label">目前帳號</span>':""}</div></div>`
-  }).join(""):'<p class="empty">尚無人員資料</p>';
+  const active=managedUsers.filter(u=>u.is_active!==false);
+  const online=active.filter(u=>isOnlineUser(u.id)).sort((a,b)=>{
+    const at=new Date(onlineProfiles.get(String(a.id))?.online_at||0)-new Date(onlineProfiles.get(String(b.id))?.online_at||0);
+    return at||(a.display_name||"").localeCompare(b.display_name||"","zh-Hant");
+  });
+  const offline=active.filter(u=>!isOnlineUser(u.id)).sort((a,b)=>(a.display_name||"").localeCompare(b.display_name||"","zh-Hant"));
+  const inactive=managedUsers.filter(u=>u.is_active===false);
+  setTextSafe("inactiveUsersCount",inactive.length);
+
+  const sections=[];
+  sections.push(`<div class="user-status-section"><div class="user-status-divider online"><span>目前上線（${online.length}）</span></div>${online.length?online.map(userManagerCard).join(""):'<p class="empty">目前沒有上線人員</p>'}</div>`);
+  sections.push(`<div class="user-status-section"><div class="user-status-divider offline"><span>目前離線（${offline.length}）</span></div>${offline.length?offline.map(userManagerCard).join(""):'<p class="empty">目前沒有離線人員</p>'}</div>`);
+  $("userManagerList").innerHTML=sections.join("");
+  bindManagedUserActions();
+  renderInactiveUsers();
+}
+function bindManagedUserActions(){
   document.querySelectorAll("[data-user-action]").forEach(b=>b.onclick=()=>handleManagedUserAction(b.dataset.userAction,b.dataset.id));
 }
+function renderInactiveUsers(){
+  const list=$("inactiveUsersList");if(!list)return;
+  const q=($("inactiveUserSearch")?.value||"").trim().toLowerCase();
+  const rows=managedUsers.filter(u=>u.is_active===false).filter(u=>!q||[u.display_name,u.username,u.email].filter(Boolean).join(" ").toLowerCase().includes(q));
+  list.innerHTML=rows.length?rows.map(u=>`<div class="inactive-user-row"><div><strong>${escapeHtml(u.display_name||u.email)}</strong><small>${escapeHtml(u.username||u.email)}｜${roleLabel(u.role)}</small></div><button class="success" data-user-action="active" data-id="${u.id}">重新啟用</button></div>`).join(""):'<p class="empty">沒有符合的停用人員</p>';
+  bindManagedUserActions();
+}
+
 async function createManagedUser(){
   if(busy)return;
   const display_name=$("newUserName").value.trim(),username=$("newUsername").value.trim().toLowerCase(),password=$("newUserPassword").value;
@@ -1471,14 +1551,25 @@ async function createManagedUser(){
   catch(e){showMessage($("userManagerMessage"),e.message||"建立失敗","error")}finally{setBusy(false)}
 }
 async function handleManagedUserAction(action,id){
-  const user=managedUsers.find(u=>u.id===id);if(!user||user.role==="admin")return;
+  const user=managedUsers.find(u=>u.id===id);if(!user||user.role==="admin"||user.id===currentUser?.id)return;
+  if(action==="save_workday"){
+    const input=document.querySelector(`[data-user-workday="${id}"]`);
+    const workday_start=input?.value||"00:00";
+    setBusy(true);try{await callUserAdmin("set_workday",{user_id:id,workday_start});showSaveToast("✓ 一日開始時間已更新");await loadManagedUsers()}catch(e){showMessage($("userManagerMessage"),e.message||"時間更新失敗","error")}finally{setBusy(false)}
+  }
+  if(action==="role"){
+    if(!isOwnerAdmin())return;
+    const makeCoAdmin=user.role!=="coadmin";
+    if(!confirm(`確定要${makeCoAdmin?"將此人設為共同管理員":"取消此人的共同管理權限"}嗎？`))return;
+    setBusy(true);try{await callUserAdmin("set_role",{user_id:id,role:makeCoAdmin?"coadmin":"recorder"});showSaveToast(makeCoAdmin?"✓ 已設為共同管理員":"✓ 已恢復為記錄員");await loadManagedUsers()}catch(e){showMessage($("userManagerMessage"),e.message||"角色更新失敗","error")}finally{setBusy(false)}
+  }
   if(action==="password"){
     const password=prompt(`請輸入 ${user.display_name||user.email} 的新密碼（至少 8 碼）`);if(password===null)return;if(password.length<8)return showMessage($("userManagerMessage"),"密碼至少 8 碼","error");
     setBusy(true);try{await callUserAdmin("reset_password",{user_id:id,password});showSaveToast("✓ 密碼已重設")}catch(e){showMessage($("userManagerMessage"),e.message||"重設失敗","error")}finally{setBusy(false)}
   }
   if(action==="active"){
     const active=user.is_active===false;if(!confirm(`確定要${active?"啟用":"停用"} ${user.display_name||user.email} 嗎？`))return;
-    setBusy(true);try{await callUserAdmin("set_active",{user_id:id,is_active:active});showSaveToast(active?"✓ 帳號已啟用":"✓ 帳號已停用");await loadManagedUsers()}catch(e){showMessage($("userManagerMessage"),e.message||"操作失敗","error")}finally{setBusy(false)}
+    setBusy(true);try{await callUserAdmin("set_active",{user_id:id,is_active:active});showSaveToast(active?"✓ 帳號已啟用":"✓ 帳號已停用");await loadManagedUsers();if(active){$("inactiveUsersModal")?.classList.add("hidden");$("userManagerModal")?.classList.remove("hidden")}}catch(e){showMessage($("userManagerMessage"),e.message||"操作失敗","error")}finally{setBusy(false)}
   }
   if(action==="ai"){
     const enabled=user.ai_capture_enabled!==true;
@@ -1525,12 +1616,20 @@ $("dashboardRecordSearchButton").onclick=searchDashboardRecords;
 $("dashboardRecordResetButton").onclick=resetDashboardRecordSearch;
 $("closeDashboardSearchResults").onclick=closeDashboardSearchResultsPanel;
 $("toggleRecordSearchDetails").onclick=toggleRecordSearchDetails;
+document.querySelectorAll("[data-record-range]").forEach(b=>b.onclick=()=>applyRecordRange(b.dataset.recordRange));
+$("dashboardRecordPersonnel").onchange=applySelectedPersonnelWorkday;
+$("includeInactivePersonnel").onchange=loadRecordSearchOptions;
+$("usePersonnelWorkday").onchange=()=>{if($("usePersonnelWorkday").checked)applySelectedPersonnelWorkday();};
 $("exportRecordSearchCsv").onclick=exportRecordSearchCsv;
 document.querySelectorAll("[data-dashboard-view]").forEach(b=>b.onclick=()=>openManagementList(b.dataset.dashboardView));$("closeManagementListModal").onclick=closeManagementList;document.querySelector("[data-close-management-list]").onclick=closeManagementList;$("managementListSearch").addEventListener("input",renderManagementList);
 $("openFinishedHistoryButton").onclick=openFinishedHistory;$("closeFinishedHistoryModal").onclick=closeFinishedHistory;document.querySelector("[data-close-finished-history]").onclick=closeFinishedHistory;$("finishedHistorySearch").addEventListener("input",renderFinishedHistory);
 $("closePersonnelStatsModal").onclick=closePersonnelStats;document.querySelector("[data-close-personnel-stats]").onclick=closePersonnelStats;$("personnelSearch").addEventListener("input",renderPersonnelStats);$("dashboardPersonnelSearch").addEventListener("input",()=>renderPersonnelInto("dashboardPersonnelList","dashboardPersonnelCount","dashboardPersonnelSearch"));
 $("closePersonnelDetailModal").onclick=closePersonnelDetail;document.querySelector("[data-close-personnel-detail]").onclick=closePersonnelDetail;
 $("userManagerButton").onclick=openUserManager;$("closeUserManagerModal").onclick=closeUserManager;document.querySelector("[data-close-users]").onclick=closeUserManager;$("createUserButton").onclick=createManagedUser;$("refreshUsersButton").onclick=loadManagedUsers;
+$("openInactiveUsersButton").onclick=()=>{$("inactiveUsersModal").classList.remove("hidden");renderInactiveUsers()};
+$("closeInactiveUsersModal").onclick=()=>{$("inactiveUsersModal").classList.add("hidden")};
+document.querySelector("[data-close-inactive-users]").onclick=()=>{$("inactiveUsersModal").classList.add("hidden")};
+$("inactiveUserSearch").oninput=renderInactiveUsers;
 $("undoButton").onclick=deleteLastGame;$("refreshButton").onclick=async()=>{try{await Promise.all([loadCloudData(),loadVenues()])}catch(e){showMessage(appMessage,e.message||"重新整理失敗","error")}};$("loginButton").onclick=login;$("logoutButton").onclick=logout;
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("shoeDetailModal").classList.contains("hidden"))return closeDetailModal();if(!$("managementListModal").classList.contains("hidden"))return closeManagementList();if(!$("personnelDetailModal").classList.contains("hidden"))return closePersonnelDetail();if(!$("personnelStatsModal").classList.contains("hidden"))return closePersonnelStats();if(!$("finishedHistoryModal").classList.contains("hidden"))return closeFinishedHistory();if(!$("myRecentShoesModal").classList.contains("hidden"))return closeMyRecentShoes();if(!$("dashboardModal").classList.contains("hidden"))return closeDashboard();if(!$("userManagerModal").classList.contains("hidden"))return closeUserManager();if(!$("editShoeModal").classList.contains("hidden"))return closeEditModal();if(!$("shoeManagerModal").classList.contains("hidden"))return closeManagerModal();if(!$("newShoeModal").classList.contains("hidden"))return closeShoeModal()}if(e.key==="Enter"&&!loginPanel.classList.contains("hidden"))login()});
 

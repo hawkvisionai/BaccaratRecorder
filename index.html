@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="favicon.png?v=1" />
   <link rel="shortcut icon" href="favicon.ico?v=1" />
   <link rel="apple-touch-icon" href="hawkvision-app-icon.png?v=1" />
-  <link rel="stylesheet" href="style.css?v=17.0" />
+  <link rel="stylesheet" href="style.css?v=17.1" />
 </head>
 <body class="brand-intro-active">
   <div id="brandIntro" class="brand-intro" aria-label="HawkVision 品牌開場">
@@ -201,6 +201,14 @@
             <p class="section-note">時間以牌靴開始記錄第一局的時間計算，可精確到年份、月份、日期與時間點。</p>
           </div>
         </div>
+        <div class="record-search-shortcuts" aria-label="快捷時間">
+          <button type="button" class="secondary compact" data-record-range="today">今天</button>
+          <button type="button" class="secondary compact" data-record-range="yesterday">昨天</button>
+          <button type="button" class="secondary compact" data-record-range="week">本週</button>
+          <button type="button" class="secondary compact" data-record-range="month">本月</button>
+          <button type="button" class="secondary compact" data-record-range="last-month">上月</button>
+          <button type="button" class="secondary compact" data-record-range="all">全部</button>
+        </div>
         <div class="record-search-fields">
           <label>場館
             <select id="dashboardRecordVenue">
@@ -218,6 +226,10 @@
           <label>結束時間
             <input id="dashboardRecordEnd" type="datetime-local" />
           </label>
+        </div>
+        <div class="record-search-options">
+          <label class="record-check"><input id="includeInactivePersonnel" type="checkbox" /> 搜尋人員清單包含已停用人員</label>
+          <label class="record-check"><input id="usePersonnelWorkday" type="checkbox" checked /> 選擇人員後自動套用該人員的一日範圍</label>
         </div>
         <div class="record-search-actions">
           <button id="dashboardRecordSearchButton" class="primary" type="button">搜尋紀錄</button>
@@ -347,8 +359,27 @@
         <button id="createUserButton" class="success" type="button">建立記錄員</button>
       </div>
       <p id="userManagerMessage" class="message"></p>
-      <div class="section-head user-list-head"><h3>人員名單</h3><button id="refreshUsersButton" class="secondary compact" type="button">重新整理</button></div>
+      <div class="section-head user-list-head">
+        <div><h3>啟用人員</h3><p class="section-note">目前上線者自動置頂，與離線人員分區顯示。</p></div>
+        <div class="user-head-actions">
+          <button id="openInactiveUsersButton" class="secondary compact" type="button">已停用人員（<span id="inactiveUsersCount">0</span>）</button>
+          <button id="refreshUsersButton" class="secondary compact" type="button">重新整理</button>
+        </div>
+      </div>
       <div id="userManagerList" class="user-manager-list"><p class="empty">讀取中…</p></div>
+    </section>
+  </div>
+
+
+  <div id="inactiveUsersModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="inactiveUsersTitle">
+    <div class="modal-backdrop" data-close-inactive-users="true"></div>
+    <section class="modal-card manager-card">
+      <div class="section-head">
+        <div><h2 id="inactiveUsersTitle">已停用人員</h2><p class="section-note">歷史牌靴與牌局完整保留，重新啟用後會自動回到人員管理主畫面。</p></div>
+        <button id="closeInactiveUsersModal" class="icon-button" type="button" aria-label="關閉">×</button>
+      </div>
+      <label class="inactive-user-search">搜尋停用人員<input id="inactiveUserSearch" type="search" placeholder="輸入姓名或帳號" /></label>
+      <div id="inactiveUsersList" class="user-manager-list"><p class="empty">尚無停用人員</p></div>
     </section>
   </div>
 
@@ -378,6 +409,6 @@
       </div>
     </div>
   </div>
-<script type="module" src="app.js?v=17.0"></script>
+<script type="module" src="app.js?v=17.1"></script>
 </body>
 </html>

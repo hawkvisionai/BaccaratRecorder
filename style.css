@@ -742,3 +742,38 @@ body:not(.brand-intro-active) .container{
   .record-detail-button-group{width:100%}
   .record-detail-button-group button{flex:1 1 160px}
 }
+
+
+/* v17.1｜搜尋快捷、人員分區、共同管理員 */
+.record-search-shortcuts{
+  display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 12px;
+}
+.record-search-options{
+  display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;color:var(--muted);font-size:13px;
+}
+.record-check{display:flex;align-items:center;gap:7px}
+.record-check input{width:auto}
+.user-head-actions{display:flex;flex-wrap:wrap;gap:8px}
+.user-status-divider{
+  display:flex;align-items:center;gap:10px;margin:12px 0 8px;color:var(--muted);font-weight:850;
+}
+.user-status-divider::before,.user-status-divider::after{content:"";height:1px;background:var(--line);flex:1}
+.user-status-divider.online span{color:#86efac}
+.user-status-divider.offline span{color:#cbd5e1}
+.online-user-row{border-color:rgba(34,197,94,.42);background:rgba(22,101,52,.08)}
+.workday-setting{display:grid;gap:4px;color:var(--muted);font-size:11px;font-weight:800}
+.workday-setting input{min-width:100px;padding:7px 8px}
+.inactive-user-search{display:grid;gap:7px;margin-bottom:12px}
+.inactive-user-row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;
+  border:1px solid var(--line);border-radius:12px;background:var(--card2);
+}
+.inactive-user-row div{display:grid;gap:4px}
+.inactive-user-row small{color:var(--muted)}
+@media(max-width:760px){
+  .record-search-shortcuts{display:grid;grid-template-columns:repeat(3,1fr)}
+  .record-search-options{display:grid}
+  .user-manager-row{grid-template-columns:1fr}
+  .workday-setting input{width:100%}
+  .inactive-user-row{align-items:flex-start}
+}
