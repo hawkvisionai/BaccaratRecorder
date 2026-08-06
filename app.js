@@ -92,7 +92,7 @@ window.addEventListener("load",()=>{
 
 setTimeout(forceFinishBrandIntro,BRAND_INTRO_FAILSAFE_MS);
 
-const APP_BUILD="16.10";
+const APP_BUILD="16.10.1";
 console.info("HawkVision Record Studio build",APP_BUILD);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
@@ -936,7 +936,7 @@ function renderRecordSearchResults(rows,start,end){
 
   const venueLabel=$("dashboardRecordVenue").selectedOptions[0]?.textContent||"全部場館";
   const personLabel=$("dashboardRecordPersonnel").selectedOptions[0]?.textContent||"全部人員";
-  $("dashboardSearchMeta").textContent=`${formatDate(start)} 至 ${formatDate(end)}｜${venueLabel}｜${personLabel}`;
+  $("dashboardSearchMeta").textContent=`第一局開始時間：${formatDate(start)} 至 ${formatDate(end)}｜${venueLabel}｜${personLabel}`;
   $("dashboardSearchResults").classList.remove("hidden");
 
   document.querySelectorAll("#recordSearchDetailList [data-admin-shoe-id]").forEach(button=>{
@@ -974,11 +974,11 @@ async function searchDashboardRecords(){
     const rows=await fetchAllRows(()=>{
       let q=supabase.from("shoes")
         .select("id,shoe_number,name,venue,status,owner_id,created_at,recording_started_at,finished_at,is_archived")
-        .not("finished_at","is",null)
+        .not("recording_started_at","is",null)
         .eq("is_archived",false)
-        .gte("finished_at",start.toISOString())
-        .lte("finished_at",end.toISOString())
-        .order("finished_at",{ascending:false});
+        .gte("recording_started_at",start.toISOString())
+        .lte("recording_started_at",end.toISOString())
+        .order("recording_started_at",{ascending:false});
       if(venue)q=q.eq("venue",venue);
       if(personnel)q=q.eq("owner_id",personnel);
       return q;
