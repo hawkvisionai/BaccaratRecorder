@@ -777,3 +777,39 @@ body:not(.brand-intro-active) .container{
   .workday-setting input{width:100%}
   .inactive-user-row{align-items:flex-start}
 }
+
+
+/* v17.1.1｜修正「一日開始」時間顯示不完整 */
+.user-manager-row{
+  grid-template-columns:minmax(180px,1.5fr) 90px 72px minmax(150px,.72fr) minmax(220px,1fr);
+}
+.workday-setting{
+  min-width:150px;
+}
+.workday-setting input[type="time"]{
+  width:100%;
+  min-width:150px;
+  box-sizing:border-box;
+  padding:9px 10px;
+  font-size:15px;
+  line-height:1.2;
+}
+@media(max-width:1100px){
+  .user-manager-row{
+    grid-template-columns:minmax(180px,1fr) 90px 72px minmax(150px,.72fr);
+  }
+  .user-actions{
+    grid-column:1/-1;
+    justify-content:flex-start;
+  }
+}
+@media(max-width:760px){
+  .user-manager-row{
+    grid-template-columns:1fr;
+  }
+  .workday-setting,
+  .workday-setting input[type="time"]{
+    width:100%;
+    min-width:0;
+  }
+}

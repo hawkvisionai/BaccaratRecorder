@@ -92,7 +92,7 @@ window.addEventListener("load",()=>{
 
 setTimeout(forceFinishBrandIntro,BRAND_INTRO_FAILSAFE_MS);
 
-const APP_BUILD="17.1";
+const APP_BUILD="17.1.1";
 console.info("HawkVision Record Studio build",APP_BUILD);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
