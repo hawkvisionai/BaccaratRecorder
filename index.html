@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="favicon.png?v=1" />
   <link rel="shortcut icon" href="favicon.ico?v=1" />
   <link rel="apple-touch-icon" href="hawkvision-app-icon.png?v=1" />
-  <link rel="stylesheet" href="style.css?v=17.2" />
+  <link rel="stylesheet" href="style.css?v=17.3" />
 </head>
 <body class="brand-intro-active">
   <div id="brandIntro" class="brand-intro" aria-label="HawkVision 品牌開場">
@@ -144,7 +144,7 @@
   <div id="shoeManagerModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="shoeManagerTitle">
     <div class="modal-backdrop" data-close-manager="true"></div>
     <section class="modal-card manager-card">
-      <div class="section-head"><div><h2 id="shoeManagerTitle">牌靴管理</h2><p class="section-note">查看、修改、封存或刪除牌靴。</p></div><button id="closeManagerModal" class="icon-button" type="button" aria-label="關閉">×</button></div>
+      <div class="section-head"><div><h2 id="shoeManagerTitle">牌靴管理</h2><p class="section-note">查看、修改基本資訊、修正已完成牌靴、封存或刪除牌靴。</p></div><button id="closeManagerModal" class="icon-button" type="button" aria-label="關閉">×</button></div>
       <div class="manager-filters"><input id="shoeSearchInput" type="search" placeholder="搜尋牌靴編號、名稱或場館" /><select id="shoeStatusFilter"><option value="active">正常牌靴</option><option value="archived">已封存</option><option value="all">全部</option></select></div>
       <p id="managerMessage" class="message"></p><div id="shoeManagerList" class="shoe-manager-list"><p class="empty">讀取中…</p></div>
     </section>
@@ -155,8 +155,82 @@
     <section class="modal-card manager-card">
       <div class="section-head"><div><h2 id="shoeDetailTitle">牌靴內容</h2><p id="shoeDetailMeta" class="section-note"></p></div><button id="closeDetailModal" class="icon-button" type="button" aria-label="關閉">×</button></div>
       <div id="shoeDetailSummary" class="shoe-detail-summary"><p class="empty">讀取中…</p></div>
-      <button id="showShoeGamesButton" class="primary shoe-games-button hidden" type="button">查看各局記錄</button>
+      <div id="shoeDetailCorrectionBadge" class="manual-correction-badge hidden">有人工修正記錄</div>
+      <div class="shoe-detail-actions">
+        <button id="showShoeGamesButton" class="primary shoe-games-button hidden" type="button">查看各局記錄</button>
+        <button id="openShoeCorrectionButton" class="warning hidden" type="button">修正牌靴</button>
+        <button id="openShoeCorrectionHistoryButton" class="secondary hidden" type="button">查看人工修正記錄</button>
+      </div>
       <div id="shoeDetailGames" class="recent-list hidden"><p class="empty">讀取中…</p></div>
+    </section>
+  </div>
+
+
+  <div id="shoeCorrectionModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="shoeCorrectionTitle">
+    <div class="modal-backdrop" data-close-shoe-correction="true"></div>
+    <section class="modal-card shoe-correction-card">
+      <div class="section-head">
+        <div>
+          <h2 id="shoeCorrectionTitle">修正已完成牌靴</h2>
+          <p id="shoeCorrectionMeta" class="section-note">僅最高管理員與共同管理員可使用；所有修正都會永久留下紀錄。</p>
+        </div>
+        <button id="closeShoeCorrectionModal" class="icon-button" type="button" aria-label="關閉">×</button>
+      </div>
+
+      <p id="shoeCorrectionMessage" class="message"></p>
+
+      <div class="shoe-correction-toolbar">
+        <button id="addCorrectionGameButton" class="primary" type="button">新增／插入牌局</button>
+        <button id="openCorrectionHistoryButton" class="secondary" type="button">查看人工修正記錄</button>
+        <span id="shoeCorrectionLockState" class="correction-lock-state">尚未鎖定</span>
+      </div>
+
+      <div id="shoeCorrectionGameList" class="shoe-correction-game-list">
+        <p class="empty">讀取中…</p>
+      </div>
+    </section>
+  </div>
+
+  <div id="gameCorrectionEditorModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="gameCorrectionEditorTitle">
+    <div class="modal-backdrop" data-close-game-correction-editor="true"></div>
+    <section class="modal-card game-correction-editor-card">
+      <div class="section-head">
+        <div>
+          <h2 id="gameCorrectionEditorTitle">修正牌局</h2>
+          <p id="gameCorrectionEditorMeta" class="section-note">點選牌位，再點選 A～K；第三張可清除。</p>
+        </div>
+        <button id="closeGameCorrectionEditorModal" class="icon-button" type="button" aria-label="關閉">×</button>
+      </div>
+
+      <label id="correctionInsertPositionRow" class="correction-position-row hidden">
+        插入位置
+        <input id="correctionInsertPosition" type="number" min="1" inputmode="numeric" />
+        <small>例如輸入 29，會插入為第 29 局，原第 29 局起自動順延。</small>
+      </label>
+
+      <div id="correctionEditorBoard" class="correction-editor-board"></div>
+      <div id="correctionRankPalette" class="correction-rank-palette"></div>
+      <div id="correctionDerivedSummary" class="correction-derived-summary"></div>
+      <p id="gameCorrectionEditorMessage" class="message"></p>
+
+      <div class="modal-actions correction-editor-actions">
+        <button id="cancelGameCorrectionButton" class="secondary" type="button">取消</button>
+        <button id="saveGameCorrectionButton" class="success" type="button">儲存修正</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="correctionHistoryModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="correctionHistoryTitle">
+    <div class="modal-backdrop" data-close-correction-history="true"></div>
+    <section class="modal-card manager-card">
+      <div class="section-head">
+        <div>
+          <h2 id="correctionHistoryTitle">人工修正記錄</h2>
+          <p class="section-note">修正記錄只允許查看，不可刪除或修改。</p>
+        </div>
+        <button id="closeCorrectionHistoryModal" class="icon-button" type="button" aria-label="關閉">×</button>
+      </div>
+      <div id="correctionHistoryList" class="correction-history-list"><p class="empty">讀取中…</p></div>
     </section>
   </div>
 
@@ -481,6 +555,6 @@
       </div>
     </div>
   </div>
-<script type="module" src="app.js?v=17.2"></script>
+<script type="module" src="app.js?v=17.3"></script>
 </body>
 </html>

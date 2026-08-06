@@ -92,7 +92,7 @@ window.addEventListener("load",()=>{
 
 setTimeout(forceFinishBrandIntro,BRAND_INTRO_FAILSAFE_MS);
 
-const APP_BUILD="17.2";
+const APP_BUILD="17.3";
 console.info("HawkVision Record Studio build",APP_BUILD);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
@@ -145,6 +145,15 @@ let recordSearchDetailsVisible = false;
 let recordSearchRange = null;
 const pendingWorkdaySaves=new Map();
 let workdaySaveSequence=0;
+
+let correctionShoe=null;
+let correctionGames=[];
+let correctionLockToken=null;
+let correctionEditingGame=null;
+let correctionEditorMode="update";
+let correctionCardState={player:[null,null,null],banker:[null,null,null]};
+let correctionSelectedSlot={side:"player",index:0};
+let correctionLockHeartbeat=null;
 
 function setTextSafe(id,value){
   const el=$(id);
@@ -547,6 +556,258 @@ async function saveAndNext(){
   finally{setBusy(false);render()}
 }
 function formatDate(value){if(!value)return"—";return new Intl.DateTimeFormat("zh-TW",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}).format(new Date(value))}
+
+function correctionProgress(state=correctionCardState){
+  const [p1,p2,p3]=state.player;
+  const [b1,b2,b3]=state.banker;
+  if(!p1||!p2||!b1||!b2)return {complete:false,message:"閒家與莊家都必須至少輸入兩張牌"};
+  const pTwo=handPoints([p1,p2]),bTwo=handPoints([b1,b2]);
+  const natural=isNatural(pTwo,bTwo);
+  const pNeeds=natural?false:playerNeedsThird(pTwo,bTwo);
+  const bNeeds=natural?false:bankerNeedsThird(bTwo,pNeeds,p3);
+  if(pNeeds&&!p3)return {complete:false,message:"依規則閒家必須補第三張"};
+  if(!pNeeds&&p3)return {complete:false,message:"依規則閒家不應有第三張"};
+  if(bNeeds&&!b3)return {complete:false,message:"依規則莊家必須補第三張"};
+  if(!bNeeds&&b3)return {complete:false,message:"依規則莊家不應有第三張"};
+  return {complete:true,message:"牌局合理"};
+}
+function correctionDerived(){
+  const valid=correctionProgress();
+  if(!valid.complete)return null;
+  const playerCards=correctionCardState.player.filter(Boolean);
+  const bankerCards=correctionCardState.banker.filter(Boolean);
+  const player=handPoints(playerCards),banker=handPoints(bankerCards);
+  const pTwo=handPoints(correctionCardState.player.slice(0,2));
+  const bTwo=handPoints(correctionCardState.banker.slice(0,2));
+  return {
+    player_points:player,banker_points:banker,winner:winnerOf(banker,player),
+    player_pair:pairOf(correctionCardState.player),banker_pair:pairOf(correctionCardState.banker),
+    player_natural:isNatural(pTwo,bTwo)&&pTwo>=8,
+    banker_natural:isNatural(pTwo,bTwo)&&bTwo>=8,
+    super_six:banker===6&&banker>player,
+    player_card_count:playerCards.length,banker_card_count:bankerCards.length
+  };
+}
+function correctionPayload(){
+  const d=correctionDerived();
+  if(!d)return null;
+  return {
+    ...d,
+    difference:d.banker_points-d.player_points,
+    player_card_1:correctionCardState.player[0],
+    player_card_2:correctionCardState.player[1],
+    player_card_3:correctionCardState.player[2],
+    banker_card_1:correctionCardState.banker[0],
+    banker_card_2:correctionCardState.banker[1],
+    banker_card_3:correctionCardState.banker[2]
+  };
+}
+function correctionSlotButton(side,index,label){
+  const rank=correctionCardState[side][index];
+  const selected=correctionSelectedSlot.side===side&&correctionSelectedSlot.index===index;
+  return `<button type="button" class="correction-card-slot ${rank?"filled":""} ${selected?"selected":""}" data-correction-side="${side}" data-correction-index="${index}">
+    <small>${label}</small><strong>${rank||"＋"}</strong>
+  </button>`;
+}
+function renderCorrectionEditor(){
+  $("correctionEditorBoard").innerHTML=`
+    <div class="correction-hand-panel player">
+      <h3>閒家</h3>
+      <div class="correction-card-row">
+        ${correctionSlotButton("player",0,"第 1 張")}
+        ${correctionSlotButton("player",1,"第 2 張")}
+        ${correctionSlotButton("player",2,"第 3 張")}
+      </div>
+    </div>
+    <div class="correction-hand-panel banker">
+      <h3>莊家</h3>
+      <div class="correction-card-row">
+        ${correctionSlotButton("banker",0,"第 1 張")}
+        ${correctionSlotButton("banker",1,"第 2 張")}
+        ${correctionSlotButton("banker",2,"第 3 張")}
+      </div>
+    </div>`;
+  const isThird=correctionSelectedSlot.index===2;
+  $("correctionRankPalette").innerHTML=RANKS.map(rank=>`<button type="button" class="rank-button" data-correction-rank="${rank}">${rank}</button>`).join("")+
+    (isThird?'<button type="button" class="rank-button clear-rank" data-correction-rank="">清除第三張</button>':"");
+  const d=correctionDerived(),progress=correctionProgress();
+  $("correctionDerivedSummary").className=`correction-derived-summary ${d?"valid":"invalid"}`;
+  $("correctionDerivedSummary").innerHTML=d
+    ?`<strong>${d.winner==="和"?"和局":`${d.winner}贏`}</strong><span>閒 ${d.player_points} 點｜莊 ${d.banker_points} 點｜共 ${d.player_card_count+d.banker_card_count} 張牌</span>`
+    :`<strong>尚未完成</strong><span>${escapeHtml(progress.message)}</span>`;
+  document.querySelectorAll("[data-correction-side]").forEach(b=>b.onclick=()=>{
+    correctionSelectedSlot={side:b.dataset.correctionSide,index:Number(b.dataset.correctionIndex)};
+    renderCorrectionEditor();
+  });
+  document.querySelectorAll("[data-correction-rank]").forEach(b=>b.onclick=()=>{
+    const rank=b.dataset.correctionRank||null;
+    const {side,index}=correctionSelectedSlot;
+    if(index<2&&!rank)return;
+    correctionCardState[side][index]=rank;
+    renderCorrectionEditor();
+  });
+}
+function correctionGameCard(g){
+  const p=[g.player_card_1,g.player_card_2,g.player_card_3].filter(Boolean);
+  const b=[g.banker_card_1,g.banker_card_2,g.banker_card_3].filter(Boolean);
+  return `<article class="correction-game-card">
+    <div class="correction-game-head">
+      <div><strong>第 ${g.game_number} 局</strong><small>${formatDate(g.created_at)}｜${escapeHtml(gameMethodLabel(g))}</small></div>
+      <span class="winner ${g.winner==="莊"?"banker":g.winner==="閒"?"player":"tie"}">${escapeHtml(g.winner||"—")}</span>
+    </div>
+    <div class="correction-game-hands">
+      <div><small>閒 ${g.player_points??"—"} 點</small><b>${p.map(escapeHtml).join("、")||"未記錄完整牌面"}</b></div>
+      <div><small>莊 ${g.banker_points??"—"} 點</small><b>${b.map(escapeHtml).join("、")||"未記錄完整牌面"}</b></div>
+    </div>
+    <div class="correction-game-actions">
+      <button type="button" class="warning" data-correction-action="edit" data-game-id="${g.id}">修改此局</button>
+      <button type="button" class="danger" data-correction-action="delete" data-game-id="${g.id}">刪除此局</button>
+    </div>
+  </article>`;
+}
+function renderCorrectionGameList(){
+  $("shoeCorrectionGameList").innerHTML=correctionGames.length
+    ?correctionGames.map(correctionGameCard).join("")
+    :'<p class="empty">這副牌靴沒有牌局</p>';
+  document.querySelectorAll("[data-correction-action]").forEach(b=>b.onclick=()=>{
+    const game=correctionGames.find(g=>String(g.id)===String(b.dataset.gameId));
+    if(!game)return;
+    if(b.dataset.correctionAction==="edit")openGameCorrectionEditor("update",game);
+    else deleteCorrectedGame(game);
+  });
+}
+async function acquireCorrectionLock(shoeId){
+  const {data,error}=await supabase.rpc("acquire_shoe_correction_lock",{p_shoe_id:shoeId});
+  if(error)throw error;
+  correctionLockToken=data?.lock_token||data;
+  setTextSafe("shoeCorrectionLockState","已取得修正鎖定");
+  $("shoeCorrectionLockState").className="correction-lock-state locked";
+  clearInterval(correctionLockHeartbeat);
+  correctionLockHeartbeat=setInterval(()=>supabase.rpc("renew_shoe_correction_lock",{p_lock_token:correctionLockToken}).catch(()=>{}),60000);
+}
+async function releaseCorrectionLock(){
+  clearInterval(correctionLockHeartbeat);correctionLockHeartbeat=null;
+  if(correctionLockToken){
+    try{await supabase.rpc("release_shoe_correction_lock",{p_lock_token:correctionLockToken});}catch(_){}
+  }
+  correctionLockToken=null;
+}
+async function openShoeCorrection(shoe){
+  if(!isManager()||shoe.status==="open")return;
+  correctionShoe=shoe;
+  $("shoeCorrectionModal").classList.remove("hidden");
+  setTextSafe("shoeCorrectionTitle",`${shoe.shoe_number||"未命名"}｜修正已完成牌靴`);
+  setTextSafe("shoeCorrectionMeta",`${shoe.venue||"未選場館"}｜所有修正都會自動同步分析索引與搜尋引擎`);
+  $("shoeCorrectionGameList").innerHTML='<p class="empty">正在取得修正鎖定…</p>';
+  try{
+    await acquireCorrectionLock(shoe.id);
+    await reloadCorrectionGames();
+  }catch(e){
+    showMessage($("shoeCorrectionMessage"),e.message||"無法開啟修正模式","error");
+    $("shoeCorrectionGameList").innerHTML='<p class="empty">目前無法修正此牌靴</p>';
+  }
+}
+async function reloadCorrectionGames(){
+  const {data,error}=await supabase.from("games").select("*").eq("shoe_id",correctionShoe.id).order("game_number",{ascending:true});
+  if(error)throw error;
+  correctionGames=data||[];
+  renderCorrectionGameList();
+}
+async function closeShoeCorrection(){
+  if(busy)return;
+  await releaseCorrectionLock();
+  $("shoeCorrectionModal").classList.add("hidden");
+  correctionShoe=null;correctionGames=[];
+}
+function openGameCorrectionEditor(modeName,game=null){
+  if(!correctionLockToken)return showMessage($("shoeCorrectionMessage"),"尚未取得修正鎖定","error");
+  correctionEditorMode=modeName;
+  correctionEditingGame=game;
+  correctionSelectedSlot={side:"player",index:0};
+  if(game){
+    correctionCardState={
+      player:[game.player_card_1||null,game.player_card_2||null,game.player_card_3||null],
+      banker:[game.banker_card_1||null,game.banker_card_2||null,game.banker_card_3||null]
+    };
+  }else{
+    correctionCardState={player:[null,null,null],banker:[null,null,null]};
+  }
+  $("correctionInsertPositionRow").classList.toggle("hidden",modeName!=="insert");
+  $("correctionInsertPosition").value=modeName==="insert"?(correctionGames.length+1):"";
+  setTextSafe("gameCorrectionEditorTitle",modeName==="insert"?"新增／插入牌局":`修正第 ${game.game_number} 局`);
+  setTextSafe("gameCorrectionEditorMeta",modeName==="insert"?"選擇插入位置並輸入完整牌面":"原牌面已帶入，可改成四張、五張或六張");
+  $("gameCorrectionEditorMessage").textContent="";
+  $("gameCorrectionEditorModal").classList.remove("hidden");
+  renderCorrectionEditor();
+}
+function closeGameCorrectionEditor(){
+  if(!busy)$("gameCorrectionEditorModal").classList.add("hidden");
+}
+async function saveGameCorrection(){
+  const payload=correctionPayload();
+  if(!payload)return showMessage($("gameCorrectionEditorMessage"),correctionProgress().message,"error");
+  const position=correctionEditorMode==="insert"?Number($("correctionInsertPosition").value):Number(correctionEditingGame?.game_number);
+  if(!Number.isInteger(position)||position<1||position>correctionGames.length+1)return showMessage($("gameCorrectionEditorMessage"),"插入位置不正確","error");
+  if(!confirm("你即將修正已完成牌靴。\n\n儲存後會更新統計、全歷史分析索引與搜尋結果，並永久保留人工修正記錄。"))return;
+  setBusy(true);
+  try{
+    const {data,error}=await supabase.rpc("apply_completed_shoe_correction",{
+      p_lock_token:correctionLockToken,
+      p_shoe_id:correctionShoe.id,
+      p_action:correctionEditorMode==="insert"?"insert":"update",
+      p_game_id:correctionEditingGame?.id||null,
+      p_position:position,
+      p_game:payload
+    });
+    if(error)throw error;
+    closeGameCorrectionEditor();
+    await reloadCorrectionGames();
+    showMessage($("shoeCorrectionMessage"),`修正完成，分析與搜尋資料已同步（索引 ${Number(data?.indexed_games||0).toLocaleString()} 局）`,"success");
+    await openShoeManager();
+  }catch(e){
+    showMessage($("gameCorrectionEditorMessage"),e.message||"修正失敗","error");
+  }finally{setBusy(false);}
+}
+async function deleteCorrectedGame(game){
+  if(!confirm(`確定刪除第 ${game.game_number} 局嗎？\n\n後續局號會自動遞補，並永久留下人工修正記錄。`))return;
+  setBusy(true);
+  try{
+    const {data,error}=await supabase.rpc("apply_completed_shoe_correction",{
+      p_lock_token:correctionLockToken,p_shoe_id:correctionShoe.id,p_action:"delete",
+      p_game_id:game.id,p_position:game.game_number,p_game:{}
+    });
+    if(error)throw error;
+    await reloadCorrectionGames();
+    showMessage($("shoeCorrectionMessage"),`已刪除第 ${game.game_number} 局，分析與搜尋資料已同步`,"success");
+    await openShoeManager();
+  }catch(e){showMessage($("shoeCorrectionMessage"),e.message||"刪除失敗","error")}
+  finally{setBusy(false)}
+}
+async function openCorrectionHistory(shoe=correctionShoe){
+  if(!shoe)return;
+  $("correctionHistoryModal").classList.remove("hidden");
+  $("correctionHistoryList").innerHTML='<p class="empty">讀取中…</p>';
+  try{
+    const {data,error}=await supabase.rpc("get_shoe_correction_history",{p_shoe_id:shoe.id});
+    if(error)throw error;
+    const rows=data||[];
+    $("correctionHistoryList").innerHTML=rows.length?rows.map(x=>{
+      const before=x.before_data||{},after=x.after_data||{};
+      const cards=v=>[v.player_card_1,v.player_card_2,v.player_card_3].filter(Boolean).join("、")+
+        "｜"+[v.banker_card_1,v.banker_card_2,v.banker_card_3].filter(Boolean).join("、");
+      const label=x.action==="insert"?"新增／插入牌局":x.action==="delete"?"刪除牌局":"修改牌局";
+      return `<article class="correction-history-item">
+        <div class="correction-history-head"><strong>${label}</strong><span>${formatDate(x.created_at)}</span></div>
+        <small>操作人員：${escapeHtml(x.corrector_name||"管理員")}｜局號：${x.game_number_after||x.game_number_before||"—"}</small>
+        ${x.action!=="insert"?`<div><b>修正前</b><p>${escapeHtml(cards(before)||"—")}｜結果 ${escapeHtml(before.winner||"—")}</p></div>`:""}
+        ${x.action!=="delete"?`<div><b>修正後</b><p>${escapeHtml(cards(after)||"—")}｜結果 ${escapeHtml(after.winner||"—")}</p></div>`:""}
+      </article>`;
+    }).join(""):'<p class="empty">尚無人工修正記錄</p>';
+  }catch(e){$("correctionHistoryList").innerHTML=`<p class="empty">${escapeHtml(e.message||"讀取失敗")}</p>`}
+}
+function closeCorrectionHistory(){if(!busy)$("correctionHistoryModal").classList.add("hidden")}
+
+
 function closeManagerModal(){if(!busy)$("shoeManagerModal").classList.add("hidden")}
 function closeDetailModal(){$("shoeDetailModal").classList.add("hidden")}
 function closeEditModal(){if(!busy){$("editShoeModal").classList.add("hidden");editingShoe=null}}
@@ -554,10 +815,10 @@ async function openShoeManager(){if(busy)return;$("shoeManagerModal").classList.
 function filteredShoes(){const q=$("shoeSearchInput").value.trim().toLowerCase(),status=$("shoeStatusFilter").value;return allShoes.filter(s=>{const archived=!!s.is_archived;if(status==="active"&&archived)return false;if(status==="archived"&&!archived)return false;const text=[s.shoe_number,s.name,s.venue].filter(Boolean).join(" ").toLowerCase();return !q||text.includes(q)})}
 function renderShoeManager(){
   const list=filteredShoes();
-  $("shoeManagerList").innerHTML=list.length?list.map(s=>{const active=currentShoe?.id===s.id,archived=!!s.is_archived;return `<div class="shoe-manager-row ${archived?"archived-row":""}"><div class="shoe-manager-main"><strong>${escapeHtml(s.shoe_number||"未命名")}${active?'<span class="active-shoe-marker">目前</span>':""}</strong><small>${escapeHtml(s.name||"未填名稱")}</small></div><div><strong>${escapeHtml(s.venue||"未選場館")}</strong><div class="shoe-manager-meta">負責：${escapeHtml(s.owner_name||"未分配")}｜${archived?"已封存":s.status==="open"?"進行中":"已結束"}</div></div><div class="shoe-manager-meta">${Number(s.game_count)||"—"}</div><div class="shoe-manager-meta">${formatDate(s.created_at)}</div><div class="shoe-actions"><button class="secondary" data-action="view" data-id="${s.id}">查看</button><button class="warning" data-action="edit" data-id="${s.id}">修改</button><button class="${archived?"restore":"archive"}" data-action="archive" data-id="${s.id}">${archived?"復原":"封存"}</button><button class="danger" data-action="delete" data-id="${s.id}">刪除</button></div></div>`}).join(""):'<p class="empty">沒有符合條件的牌靴</p>';
+  $("shoeManagerList").innerHTML=list.length?list.map(s=>{const active=currentShoe?.id===s.id,archived=!!s.is_archived;return `<div class="shoe-manager-row ${archived?"archived-row":""}"><div class="shoe-manager-main"><strong>${escapeHtml(s.shoe_number||"未命名")}${active?'<span class="active-shoe-marker">目前</span>':""}</strong><small>${escapeHtml(s.name||"未填名稱")}</small>${s.has_manual_corrections?'<span class="manual-correction-inline">有人工修正記錄</span>':""}</div><div><strong>${escapeHtml(s.venue||"未選場館")}</strong><div class="shoe-manager-meta">負責：${escapeHtml(s.owner_name||"未分配")}｜${archived?"已封存":s.status==="open"?"進行中":"已結束"}</div></div><div class="shoe-manager-meta">${Number(s.game_count)||"—"}</div><div class="shoe-manager-meta">${formatDate(s.created_at)}</div><div class="shoe-actions"><button class="secondary" data-action="view" data-id="${s.id}">查看</button><button class="warning" data-action="edit" data-id="${s.id}">修改基本資訊</button>${s.status!=="open"?`<button class="warning" data-action="correct" data-id="${s.id}">修正牌靴</button>`:""}<button class="${archived?"restore":"archive"}" data-action="archive" data-id="${s.id}">${archived?"復原":"封存"}</button><button class="danger" data-action="delete" data-id="${s.id}">刪除</button></div></div>`}).join(""):'<p class="empty">沒有符合條件的牌靴</p>';
   document.querySelectorAll("#shoeManagerList [data-action]").forEach(b=>b.onclick=()=>handleShoeAction(b.dataset.action,b.dataset.id));
 }
-async function handleShoeAction(action,id){const shoe=allShoes.find(s=>String(s.id)===String(id));if(!shoe)return;if(action==="view")return viewShoe(shoe);if(action==="edit")return openEditShoe(shoe);if(action==="archive")return toggleArchiveShoe(shoe);if(action==="delete")return deleteShoe(shoe)}
+async function handleShoeAction(action,id){const shoe=allShoes.find(s=>String(s.id)===String(id));if(!shoe)return;if(action==="view")return viewShoe(shoe);if(action==="edit")return openEditShoe(shoe);if(action==="correct")return openShoeCorrection(shoe);if(action==="archive")return toggleArchiveShoe(shoe);if(action==="delete")return deleteShoe(shoe)}
 function detailCards(g,side){
   const cards=[g[`${side}_card_1`],g[`${side}_card_2`],g[`${side}_card_3`]].filter(Boolean);
   return cards.length?cards.map(escapeHtml).join("、"):"未記錄牌面";
@@ -587,6 +848,9 @@ async function viewShoe(shoe,options={}){
   $("shoeDetailSummary").innerHTML='<p class="empty">讀取中…</p>';
   $("shoeDetailGames").innerHTML='<p class="empty">讀取中…</p>';
   $("shoeDetailGames").classList.add("hidden");$("showShoeGamesButton").classList.add("hidden");
+  $("openShoeCorrectionButton").classList.add("hidden");
+  $("openShoeCorrectionHistoryButton").classList.add("hidden");
+  $("shoeDetailCorrectionBadge").classList.add("hidden");
   $("shoeDetailModal").classList.remove("hidden");
   try{
     const [{data:games,error},{data:profile,error:profileError}]=await Promise.all([
@@ -602,6 +866,12 @@ async function viewShoe(shoe,options={}){
     $("showShoeGamesButton").classList.remove("hidden");
     $("showShoeGamesButton").textContent=`查看各局記錄（${rows.length} 局）`;
     $("showShoeGamesButton").onclick=()=>{$("shoeDetailGames").classList.remove("hidden");$("showShoeGamesButton").classList.add("hidden");};
+    const canCorrect=isManager()&&!recorderHistory&&shoe.status!=="open";
+    $("openShoeCorrectionButton").classList.toggle("hidden",!canCorrect);
+    $("openShoeCorrectionButton").onclick=()=>openShoeCorrection(shoe);
+    $("shoeDetailCorrectionBadge").classList.toggle("hidden",!shoe.has_manual_corrections);
+    $("openShoeCorrectionHistoryButton").classList.toggle("hidden",!shoe.has_manual_corrections||recorderHistory);
+    $("openShoeCorrectionHistoryButton").onclick=()=>openCorrectionHistory(shoe);
   }catch(e){$("shoeDetailSummary").innerHTML=`<p class="empty">${escapeHtml(e.message||"讀取失敗")}</p>`;}
 }
 
@@ -1823,6 +2093,18 @@ $("winnerSuperSix").onclick=()=>{if(winnerOnlyState.winner==="莊"){winnerOnlySt
 $("newShoeButton").onclick=openShoeModal;$("finishShoeButton").onclick=finishCurrentShoe;$("confirmShoeButton").onclick=createNewShoe;$("addVenueButton").onclick=addVenue;$("closeShoeModal").onclick=closeShoeModal;$("cancelShoeButton").onclick=closeShoeModal;document.querySelector("[data-close-modal]").onclick=closeShoeModal;
 $("myRecentShoesButton").onclick=openMyRecentShoes;$("closeMyRecentShoesModal").onclick=closeMyRecentShoes;document.querySelector("[data-close-my-recent-shoes]").onclick=closeMyRecentShoes;
 $("manageShoesButton").onclick=openShoeManager;$("closeManagerModal").onclick=closeManagerModal;document.querySelector("[data-close-manager]").onclick=closeManagerModal;$("shoeSearchInput").oninput=renderShoeManager;$("shoeStatusFilter").onchange=renderShoeManager;
+
+$("closeShoeCorrectionModal").onclick=closeShoeCorrection;
+document.querySelector("[data-close-shoe-correction]").onclick=closeShoeCorrection;
+$("addCorrectionGameButton").onclick=()=>openGameCorrectionEditor("insert");
+$("openCorrectionHistoryButton").onclick=()=>openCorrectionHistory(correctionShoe);
+$("closeGameCorrectionEditorModal").onclick=closeGameCorrectionEditor;
+document.querySelector("[data-close-game-correction-editor]").onclick=closeGameCorrectionEditor;
+$("cancelGameCorrectionButton").onclick=closeGameCorrectionEditor;
+$("saveGameCorrectionButton").onclick=saveGameCorrection;
+$("closeCorrectionHistoryModal").onclick=closeCorrectionHistory;
+document.querySelector("[data-close-correction-history]").onclick=closeCorrectionHistory;
+
 $("closeDetailModal").onclick=closeDetailModal;document.querySelector("[data-close-detail]").onclick=closeDetailModal;$("closeEditModal").onclick=closeEditModal;$("cancelEditShoeButton").onclick=closeEditModal;document.querySelector("[data-close-edit]").onclick=closeEditModal;$("saveEditShoeButton").onclick=saveEditedShoe;
 $("dashboardButton").onclick=openDashboard;
 $("closeDashboardModal").onclick=closeDashboard;
@@ -1853,7 +2135,7 @@ $("closeInactiveUsersModal").onclick=()=>{$("inactiveUsersModal").classList.add(
 document.querySelector("[data-close-inactive-users]").onclick=()=>{$("inactiveUsersModal").classList.add("hidden")};
 $("inactiveUserSearch").oninput=renderInactiveUsers;
 $("undoButton").onclick=deleteLastGame;$("refreshButton").onclick=async()=>{try{await Promise.all([loadCloudData(),loadVenues()])}catch(e){showMessage(appMessage,e.message||"重新整理失敗","error")}};$("loginButton").onclick=login;$("logoutButton").onclick=logout;
-document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("shoeDetailModal").classList.contains("hidden"))return closeDetailModal();if(!$("managementListModal").classList.contains("hidden"))return closeManagementList();if(!$("personnelDetailModal").classList.contains("hidden"))return closePersonnelDetail();if(!$("personnelStatsModal").classList.contains("hidden"))return closePersonnelStats();if(!$("finishedHistoryModal").classList.contains("hidden"))return closeFinishedHistory();if(!$("myRecentShoesModal").classList.contains("hidden"))return closeMyRecentShoes();if(!$("systemHealthModal").classList.contains("hidden"))return closeSystemHealth();if(!$("dashboardModal").classList.contains("hidden"))return closeDashboard();if(!$("userManagerModal").classList.contains("hidden"))return closeUserManager();if(!$("editShoeModal").classList.contains("hidden"))return closeEditModal();if(!$("shoeManagerModal").classList.contains("hidden"))return closeManagerModal();if(!$("newShoeModal").classList.contains("hidden"))return closeShoeModal()}if(e.key==="Enter"&&!loginPanel.classList.contains("hidden"))login()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("gameCorrectionEditorModal").classList.contains("hidden"))return closeGameCorrectionEditor();if(!$("correctionHistoryModal").classList.contains("hidden"))return closeCorrectionHistory();if(!$("shoeCorrectionModal").classList.contains("hidden"))return closeShoeCorrection();if(!$("shoeDetailModal").classList.contains("hidden"))return closeDetailModal();if(!$("managementListModal").classList.contains("hidden"))return closeManagementList();if(!$("personnelDetailModal").classList.contains("hidden"))return closePersonnelDetail();if(!$("personnelStatsModal").classList.contains("hidden"))return closePersonnelStats();if(!$("finishedHistoryModal").classList.contains("hidden"))return closeFinishedHistory();if(!$("myRecentShoesModal").classList.contains("hidden"))return closeMyRecentShoes();if(!$("systemHealthModal").classList.contains("hidden"))return closeSystemHealth();if(!$("dashboardModal").classList.contains("hidden"))return closeDashboard();if(!$("userManagerModal").classList.contains("hidden"))return closeUserManager();if(!$("editShoeModal").classList.contains("hidden"))return closeEditModal();if(!$("shoeManagerModal").classList.contains("hidden"))return closeManagerModal();if(!$("newShoeModal").classList.contains("hidden"))return closeShoeModal()}if(e.key==="Enter"&&!loginPanel.classList.contains("hidden"))login()});
 
 syncNextRoundPlacement();renderCardInput();updateWinnerOnlyUI();updateRecordState();
 supabase.auth.onAuthStateChange(async(_event,session)=>session?await showAuthenticated(session):showLoggedOut());
