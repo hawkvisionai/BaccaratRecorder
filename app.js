@@ -92,7 +92,13 @@ window.addEventListener("load",()=>{
 
 setTimeout(forceFinishBrandIntro,BRAND_INTRO_FAILSAFE_MS);
 
-const APP_BUILD="17.3.2";
+const APP_BUILD="17.3.3";
+
+function syncVisibleAppVersion(){
+  const el=document.getElementById("appVersionBadge");
+  if(el)el.textContent=`v${APP_BUILD}`;
+}
+
 console.info("HawkVision Record Studio build",APP_BUILD);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
@@ -2229,3 +2235,9 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("gameCorrecti
 syncNextRoundPlacement();renderCardInput();updateWinnerOnlyUI();updateRecordState();
 supabase.auth.onAuthStateChange(async(_event,session)=>session?await showAuthenticated(session):showLoggedOut());
 const {data:{session}}=await supabase.auth.getSession();if(session)await showAuthenticated(session);else showLoggedOut();
+
+if(document.readyState==="loading"){
+  document.addEventListener("DOMContentLoaded",syncVisibleAppVersion,{once:true});
+}else{
+  syncVisibleAppVersion();
+}

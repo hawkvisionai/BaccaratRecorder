@@ -1072,3 +1072,50 @@ body:not(.brand-intro-active) .container{
 @media(max-width:560px){
   .correction-winner-options{grid-template-columns:1fr}
 }
+
+
+/* v17.3.3｜修正牌靴「只記勝方」莊閒和色彩區分 */
+.correction-winner-buttons .correction-winner-banker{
+  background:linear-gradient(180deg,#8f2633,#671a25) !important;
+  border-color:#d85a69 !important;
+  color:#fff !important;
+}
+.correction-winner-buttons .correction-winner-player{
+  background:linear-gradient(180deg,#245fb5,#173f80) !important;
+  border-color:#5c9cff !important;
+  color:#fff !important;
+}
+.correction-winner-buttons .correction-winner-tie{
+  background:linear-gradient(180deg,#23835a,#175a3f) !important;
+  border-color:#55c78e !important;
+  color:#fff !important;
+}
+.correction-winner-buttons .correction-winner-banker.selected{
+  box-shadow:0 0 0 3px rgba(216,90,105,.34),0 0 22px rgba(216,90,105,.28) !important;
+}
+.correction-winner-buttons .correction-winner-player.selected{
+  box-shadow:0 0 0 3px rgba(92,156,255,.34),0 0 22px rgba(92,156,255,.28) !important;
+}
+.correction-winner-buttons .correction-winner-tie.selected{
+  box-shadow:0 0 0 3px rgba(85,199,142,.34),0 0 22px rgba(85,199,142,.28) !important;
+}
+
+/* v17.3.3｜畫面固定顯示版本號 */
+.app-version-badge{
+  position:fixed;
+  right:14px;
+  bottom:12px;
+  z-index:10050;
+  padding:6px 10px;
+  border:1px solid rgba(148,163,184,.42);
+  border-radius:999px;
+  background:rgba(8,18,34,.88);
+  color:#cbd5e1;
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.04em;
+  line-height:1;
+  box-shadow:0 6px 20px rgba(0,0,0,.22);
+  backdrop-filter:blur(8px);
+  pointer-events:none;
+}

@@ -8,9 +8,11 @@
   <link rel="icon" type="image/png" href="favicon.png?v=1" />
   <link rel="shortcut icon" href="favicon.ico?v=1" />
   <link rel="apple-touch-icon" href="hawkvision-app-icon.png?v=1" />
-  <link rel="stylesheet" href="style.css?v=17.3.2" />
+  <link rel="stylesheet" href="style.css?v=17.3.3" />
 </head>
 <body class="brand-intro-active">
+  <div id="appVersionBadge" class="app-version-badge" aria-label="目前版本">v17.3.3</div>
+
   <div id="brandIntro" class="brand-intro" aria-label="HawkVision 品牌開場">
     <div class="intro-brand">
       <div class="intro-logo-wrap">
@@ -216,9 +218,9 @@
       <div id="correctionWinnerOnlyPanel" class="correction-winner-only-panel hidden">
         <p>選擇這一局的結果</p>
         <div class="correction-winner-buttons">
-          <button type="button" class="banker" data-correction-winner="莊">莊</button>
-          <button type="button" class="player" data-correction-winner="閒">閒</button>
-          <button type="button" class="tie" data-correction-winner="和">和</button>
+          <button type="button" class="banker correction-winner-banker" data-correction-winner="莊">莊</button>
+          <button type="button" class="player correction-winner-player" data-correction-winner="閒">閒</button>
+          <button type="button" class="tie correction-winner-tie" data-correction-winner="和">和</button>
         </div>
 
         <div class="correction-winner-options">
@@ -576,6 +578,6 @@
       </div>
     </div>
   </div>
-<script type="module" src="app.js?v=17.3.2"></script>
+<script type="module" src="app.js?v=17.3.3"></script>
 </body>
 </html>
