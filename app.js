@@ -92,7 +92,7 @@ window.addEventListener("load",()=>{
 
 setTimeout(forceFinishBrandIntro,BRAND_INTRO_FAILSAFE_MS);
 
-const APP_BUILD="16.10.1";
+const APP_BUILD="17.0";
 console.info("HawkVision Record Studio build",APP_BUILD);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
@@ -142,6 +142,26 @@ let managementListType = "";
 let managementGamesOffset = 0;
 let recordSearchData = [];
 let recordSearchDetailsVisible = false;
+let recordSearchRange = null;
+
+function setTextSafe(id,value){
+  const el=$(id);
+  if(el)el.textContent=String(value);
+}
+
+function startOfWeekLocal(date=new Date()){
+  const d=new Date(date);
+  const day=(d.getDay()+6)%7;
+  d.setDate(d.getDate()-day);
+  d.setHours(0,0,0,0);
+  return d;
+}
+
+function startOfMonthLocal(date=new Date()){
+  const d=new Date(date.getFullYear(),date.getMonth(),1);
+  d.setHours(0,0,0,0);
+  return d;
+}
 
 const loginPanel = $("loginPanel");
 const appPanel = $("appPanel");
@@ -663,16 +683,24 @@ async function loadDashboard(silent=false){
     $("dashboardPersonnelList").innerHTML='<p class="empty">讀取中…</p>';
   }
   try{
-    const today=startOfTodayIso();
-    const [activeR,todayFinishedR,totalShoesR,totalGamesR,recentShoesR,finishedR]=await Promise.all([
+    const now=new Date();
+    const todayDate=new Date(now);todayDate.setHours(0,0,0,0);
+    const today=todayDate.toISOString();
+    const weekStart=startOfWeekLocal(now).toISOString();
+    const monthStart=startOfMonthLocal(now).toISOString();
+    const [activeR,todayFinishedR,totalShoesR,totalGamesR,recentShoesR,finishedR,weekShoesR,monthShoesR,todayGamesR,monthGamesR]=await Promise.all([
       supabase.from("shoes").select("id,shoe_number,name,venue,status,owner_id,created_at,recording_started_at,finished_at,is_archived").eq("status","open").eq("is_archived",false).order("created_at",{ascending:false}),
       supabase.from("shoes").select("id",{count:"exact",head:true}).gte("finished_at",today).eq("is_archived",false),
       supabase.from("shoes").select("id",{count:"exact",head:true}).not("finished_at","is",null).eq("is_archived",false),
       supabase.from("games").select("id",{count:"exact",head:true}),
       supabase.from("shoes").select("id,shoe_number,name,venue,status,owner_id,created_at,recording_started_at,finished_at,is_archived").order("created_at",{ascending:false}).limit(30),
-      supabase.from("shoes").select("id,shoe_number,name,venue,status,owner_id,created_at,recording_started_at,finished_at,is_archived").not("finished_at","is",null).eq("is_archived",false).order("finished_at",{ascending:false}).limit(5)
+      supabase.from("shoes").select("id,shoe_number,name,venue,status,owner_id,created_at,recording_started_at,finished_at,is_archived").not("finished_at","is",null).eq("is_archived",false).order("finished_at",{ascending:false}).limit(5),
+      supabase.from("shoes").select("id",{count:"exact",head:true}).not("finished_at","is",null).gte("recording_started_at",weekStart).eq("is_archived",false),
+      supabase.from("shoes").select("id",{count:"exact",head:true}).not("finished_at","is",null).gte("recording_started_at",monthStart).eq("is_archived",false),
+      supabase.from("games").select("id",{count:"exact",head:true}).gte("created_at",today),
+      supabase.from("games").select("id",{count:"exact",head:true}).gte("created_at",monthStart)
     ]);
-    const responses=[activeR,todayFinishedR,totalShoesR,totalGamesR,recentShoesR,finishedR];
+    const responses=[activeR,todayFinishedR,totalShoesR,totalGamesR,recentShoesR,finishedR,weekShoesR,monthShoesR,todayGamesR,monthGamesR];
     const err=responses.find(r=>r.error)?.error;if(err)throw err;
     const active=activeR.data||[],finished=finishedR.data||[];
     const ownerIds=[...new Set([...active,...finished].map(s=>s.owner_id).filter(Boolean))];
@@ -684,8 +712,27 @@ async function loadDashboard(silent=false){
     const gameMap=new Map();
     games.forEach(g=>{const key=String(g.shoe_id),x=gameMap.get(key)||{count:0,last_at:null};x.count+=1;if(!x.last_at||new Date(g.created_at)>new Date(x.last_at))x.last_at=g.created_at;gameMap.set(key,x)});
     const attach=s=>({...s,owner_name:ownerMap.get(String(s.owner_id))||"未指定",...(gameMap.get(String(s.id))||{count:0,last_at:null})});
-    dashboardData={active:active.map(attach),finished:finished.map(attach),todayFinished:todayFinishedR.count||0,totalShoes:totalShoesR.count||0,totalGames:totalGamesR.count||0,recentShoes:recentShoesR.data||[]};
+    dashboardData={
+      active:active.map(attach),
+      finished:finished.map(attach),
+      todayFinished:todayFinishedR.count||0,
+      totalShoes:totalShoesR.count||0,
+      totalGames:totalGamesR.count||0,
+      recentShoes:recentShoesR.data||[],
+      weekShoes:weekShoesR.count||0,
+      monthShoes:monthShoesR.count||0,
+      todayGames:todayGamesR.count||0,
+      monthGames:monthGamesR.count||0,
+      activePersonnel:new Set(active.map(s=>s.owner_id).filter(Boolean)).size
+    };
     renderDashboard();
+    setTextSafe("opsTodayShoes",dashboardData.todayFinished);
+    setTextSafe("opsWeekShoes",dashboardData.weekShoes);
+    setTextSafe("opsMonthShoes",dashboardData.monthShoes);
+    setTextSafe("opsTodayGames",dashboardData.todayGames);
+    setTextSafe("opsMonthGames",dashboardData.monthGames);
+    setTextSafe("opsActivePersonnel",dashboardData.activePersonnel);
+    setTextSafe("opsActiveShoes",dashboardData.active.length);
     await loadPersonnelStatsInline();
   }catch(e){console.error(e);showMessage($("dashboardMessage"),e.message||"讀取管理總覽失敗","error")}
 }
@@ -919,16 +966,25 @@ function renderRecordSearchResults(rows,start,end){
   const venueBreakdown=aggregateRecordSearch(rows,s=>s.venue||"未選場館");
   const personnelBreakdown=aggregateRecordSearch(rows,s=>s.owner_name||"未指定");
   const totalGames=rows.reduce((sum,s)=>sum+(Number(s.count)||0),0);
+  const durations=rows
+    .map(s=>s.recording_started_at&&s.finished_at?(new Date(s.finished_at)-new Date(s.recording_started_at))/60000:null)
+    .filter(v=>Number.isFinite(v)&&v>=0);
+  const averageGames=rows.length?totalGames/rows.length:0;
+  const averageDuration=durations.length?durations.reduce((a,b)=>a+b,0)/durations.length:0;
 
-  $("recordSearchShoeTotal").textContent=rows.length;
-  $("recordSearchGameTotal").textContent=totalGames;
-  $("recordSearchVenueTotal").textContent=venueBreakdown.length;
-  $("recordSearchPersonnelTotal").textContent=personnelBreakdown.length;
-  $("recordVenueBreakdownCount").textContent=`${venueBreakdown.length} 個`;
-  $("recordPersonnelBreakdownCount").textContent=`${personnelBreakdown.length} 人`;
+  setTextSafe("recordSearchShoeTotal",rows.length);
+  setTextSafe("recordSearchGameTotal",totalGames);
+  setTextSafe("recordSearchAverageGames",averageGames.toFixed(1));
+  setTextSafe("recordSearchAverageDuration",Math.round(averageDuration));
+  setTextSafe("recordSearchVenueTotal",venueBreakdown.length);
+  setTextSafe("recordSearchPersonnelTotal",personnelBreakdown.length);
+  setTextSafe("recordSearchTopVenue",venueBreakdown[0]?.label||"—");
+  setTextSafe("recordSearchTopPersonnel",personnelBreakdown[0]?.label||"—");
+  setTextSafe("recordVenueBreakdownCount",`${venueBreakdown.length} 個`);
+  setTextSafe("recordPersonnelBreakdownCount",`${personnelBreakdown.length} 人`);
   $("recordVenueBreakdown").innerHTML=venueBreakdown.length?venueBreakdown.map(breakdownRow).join(""):'<p class="empty">沒有符合的場館紀錄</p>';
   $("recordPersonnelBreakdown").innerHTML=personnelBreakdown.length?personnelBreakdown.map(breakdownRow).join(""):'<p class="empty">沒有符合的人員紀錄</p>';
-  $("recordSearchDetailCount").textContent=`${rows.length} 副`;
+  setTextSafe("recordSearchDetailCount",`${rows.length} 副`);
   $("recordSearchDetailList").classList.add("hidden");
   $("recordSearchDetailList").innerHTML=rows.length?rows.map(adminRecordCard).join(""):'<p class="empty">沒有符合條件的完成紀錄</p>';
   $("toggleRecordSearchDetails").textContent="查看符合的牌靴明細";
@@ -936,8 +992,14 @@ function renderRecordSearchResults(rows,start,end){
 
   const venueLabel=$("dashboardRecordVenue").selectedOptions[0]?.textContent||"全部場館";
   const personLabel=$("dashboardRecordPersonnel").selectedOptions[0]?.textContent||"全部人員";
-  $("dashboardSearchMeta").textContent=`第一局開始時間：${formatDate(start)} 至 ${formatDate(end)}｜${venueLabel}｜${personLabel}`;
+  setTextSafe("dashboardSearchMeta",`第一局開始時間：${formatDate(start)} 至 ${formatDate(end)}｜${venueLabel}｜${personLabel}`);
+  recordSearchRange={start,end,venueLabel,personLabel};
   $("dashboardSearchResults").classList.remove("hidden");
+  showMessage(
+    $("dashboardMessage"),
+    rows.length?`已找到 ${rows.length} 副牌靴，共 ${totalGames} 局`:"沒有符合條件的紀錄",
+    rows.length?"success":"info"
+  );
 
   document.querySelectorAll("#recordSearchDetailList [data-admin-shoe-id]").forEach(button=>{
     button.onclick=async()=>{
@@ -967,8 +1029,7 @@ async function searchDashboardRecords(){
   const personnel=$("dashboardRecordPersonnel").value;
   const box=$("dashboardSearchResults");
   box.classList.remove("hidden");
-  box.innerHTML='<p class="empty">正在統計完成牌靴與局數…</p>';
-  $("dashboardMessage").textContent="";
+  showMessage($("dashboardMessage"),"正在統計完成牌靴與局數…","info");
 
   try{
     const rows=await fetchAllRows(()=>{
@@ -986,7 +1047,9 @@ async function searchDashboardRecords(){
     const detailed=await attachRecordSearchDetails(rows);
     renderRecordSearchResults(detailed,start,end);
   }catch(e){
-    box.innerHTML=`<p class="empty">${escapeHtml(e.message||"搜尋紀錄失敗")}</p>`;
+    console.error(e);
+    showMessage($("dashboardMessage"),e.message||"搜尋紀錄失敗","error");
+    box.classList.add("hidden");
   }
 }
 
@@ -1003,6 +1066,47 @@ function resetDashboardRecordSearch(){
   defaultRecordSearchRange();
   closeDashboardSearchResultsPanel();
   $("dashboardMessage").textContent="";
+}
+
+function csvCell(value){
+  const text=String(value??"").replace(/"/g,'""');
+  return `"${text}"`;
+}
+
+function exportRecordSearchCsv(){
+  if(!recordSearchData.length){
+    return showMessage($("dashboardMessage"),"目前沒有可匯出的搜尋結果","error");
+  }
+
+  const headers=["牌靴編號","牌靴名稱","場館","記錄人員","第一局開始時間","完成時間","總局數","記錄分鐘"];
+  const rows=recordSearchData.map(s=>{
+    const duration=s.recording_started_at&&s.finished_at
+      ?Math.max(0,Math.round((new Date(s.finished_at)-new Date(s.recording_started_at))/60000))
+      :"";
+    return [
+      s.shoe_number||"",
+      s.name||"",
+      s.venue||"",
+      s.owner_name||"",
+      s.recording_started_at?formatDate(s.recording_started_at):"",
+      s.finished_at?formatDate(s.finished_at):"",
+      s.count||0,
+      duration
+    ];
+  });
+
+  const csv="\uFEFF"+[headers,...rows].map(row=>row.map(csvCell).join(",")).join("\r\n");
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  const pad=n=>String(n).padStart(2,"0");
+  const now=new Date();
+  a.href=url;
+  a.download=`HawkVision_搜尋紀錄_${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
 function toggleRecordSearchDetails(){
@@ -1421,6 +1525,7 @@ $("dashboardRecordSearchButton").onclick=searchDashboardRecords;
 $("dashboardRecordResetButton").onclick=resetDashboardRecordSearch;
 $("closeDashboardSearchResults").onclick=closeDashboardSearchResultsPanel;
 $("toggleRecordSearchDetails").onclick=toggleRecordSearchDetails;
+$("exportRecordSearchCsv").onclick=exportRecordSearchCsv;
 document.querySelectorAll("[data-dashboard-view]").forEach(b=>b.onclick=()=>openManagementList(b.dataset.dashboardView));$("closeManagementListModal").onclick=closeManagementList;document.querySelector("[data-close-management-list]").onclick=closeManagementList;$("managementListSearch").addEventListener("input",renderManagementList);
 $("openFinishedHistoryButton").onclick=openFinishedHistory;$("closeFinishedHistoryModal").onclick=closeFinishedHistory;document.querySelector("[data-close-finished-history]").onclick=closeFinishedHistory;$("finishedHistorySearch").addEventListener("input",renderFinishedHistory);
 $("closePersonnelStatsModal").onclick=closePersonnelStats;document.querySelector("[data-close-personnel-stats]").onclick=closePersonnelStats;$("personnelSearch").addEventListener("input",renderPersonnelStats);$("dashboardPersonnelSearch").addEventListener("input",()=>renderPersonnelInto("dashboardPersonnelList","dashboardPersonnelCount","dashboardPersonnelSearch"));

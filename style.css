@@ -661,3 +661,84 @@ body:not(.brand-intro-active) .container{
   .record-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .record-breakdown-row{align-items:flex-start}
 }
+
+
+/* v17.0 Management Dashboard */
+.management-overview-panel{
+  margin:12px 0 14px;
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:linear-gradient(145deg,#0b1527,#111e34);
+}
+.management-overview-grid{
+  display:grid;
+  grid-template-columns:repeat(7,minmax(0,1fr));
+  gap:9px;
+}
+.management-overview-grid>div{
+  min-width:0;
+  padding:12px 8px;
+  border:1px solid var(--line);
+  border-radius:13px;
+  text-align:center;
+  background:var(--card2);
+}
+.management-overview-grid span,
+.management-overview-grid small{
+  display:block;
+  color:var(--muted);
+}
+.management-overview-grid span{
+  min-height:2.5em;
+  font-size:12px;
+  font-weight:800;
+}
+.management-overview-grid strong{
+  display:block;
+  margin:5px 0 2px;
+  font-size:26px;
+}
+.record-summary-grid-six{
+  grid-template-columns:repeat(6,minmax(0,1fr));
+}
+.record-operation-summary{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin:0 0 14px;
+}
+.record-operation-summary>div{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:12px 14px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#0a1423;
+}
+.record-operation-summary span{color:var(--muted);font-size:13px}
+.record-operation-summary strong{
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.record-detail-button-group{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+@media(max-width:1180px){
+  .management-overview-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .record-summary-grid-six{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:700px){
+  .management-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .record-summary-grid-six{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .record-operation-summary{grid-template-columns:1fr}
+  .record-detail-actions{align-items:flex-start}
+  .record-detail-button-group{width:100%}
+  .record-detail-button-group button{flex:1 1 160px}
+}

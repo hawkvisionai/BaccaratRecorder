@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="favicon.png?v=1" />
   <link rel="shortcut icon" href="favicon.ico?v=1" />
   <link rel="apple-touch-icon" href="hawkvision-app-icon.png?v=1" />
-  <link rel="stylesheet" href="style.css?v=16.10.1" />
+  <link rel="stylesheet" href="style.css?v=17.0" />
 </head>
 <body class="brand-intro-active">
   <div id="brandIntro" class="brand-intro" aria-label="HawkVision 品牌開場">
@@ -176,6 +176,24 @@
       <div class="section-head dashboard-heading"><div><h2 id="dashboardTitle">管理總覽</h2><p class="section-note">查看目前狀態，並依場館、人員與精確時間範圍統計完成紀錄。</p></div><div class="dashboard-head-actions"><span id="dashboardUpdatedAt" class="dashboard-updated">—</span><button id="refreshDashboardButton" class="secondary compact" type="button">重新整理</button><button id="closeDashboardModal" class="icon-button" type="button" aria-label="關閉">×</button></div></div>
       <p id="dashboardMessage" class="message"></p>
 
+      <section class="management-overview-panel">
+        <div class="section-head">
+          <div>
+            <h3>即時營運總覽</h3>
+            <p class="section-note">依牌靴第一局開始記錄時間統計；「目前記錄人員」為正在進行牌靴的人員。</p>
+          </div>
+        </div>
+        <div class="management-overview-grid">
+          <div><span>今日完成牌靴</span><strong id="opsTodayShoes">0</strong><small>副</small></div>
+          <div><span>本週完成牌靴</span><strong id="opsWeekShoes">0</strong><small>副</small></div>
+          <div><span>本月完成牌靴</span><strong id="opsMonthShoes">0</strong><small>副</small></div>
+          <div><span>今日累計局數</span><strong id="opsTodayGames">0</strong><small>局</small></div>
+          <div><span>本月累計局數</span><strong id="opsMonthGames">0</strong><small>局</small></div>
+          <div><span>目前記錄人員</span><strong id="opsActivePersonnel">0</strong><small>人</small></div>
+          <div><span>進行中牌靴</span><strong id="opsActiveShoes">0</strong><small>副</small></div>
+        </div>
+      </section>
+
       <section class="record-search-panel">
         <div class="section-head record-search-heading">
           <div>
@@ -216,11 +234,18 @@
           <button id="closeDashboardSearchResults" class="icon-button" type="button" aria-label="關閉搜尋結果">×</button>
         </div>
 
-        <div class="record-summary-grid">
+        <div class="record-summary-grid record-summary-grid-six">
           <div><span>完成牌靴總數</span><strong id="recordSearchShoeTotal">0</strong><small>副</small></div>
           <div><span>總累計局數</span><strong id="recordSearchGameTotal">0</strong><small>局</small></div>
+          <div><span>平均每副局數</span><strong id="recordSearchAverageGames">0</strong><small>局／副</small></div>
+          <div><span>平均記錄時間</span><strong id="recordSearchAverageDuration">0</strong><small>分鐘</small></div>
           <div><span>涵蓋場館</span><strong id="recordSearchVenueTotal">0</strong><small>個</small></div>
           <div><span>記錄人員</span><strong id="recordSearchPersonnelTotal">0</strong><small>人</small></div>
+        </div>
+
+        <div class="record-operation-summary">
+          <div><span>完成最多場館</span><strong id="recordSearchTopVenue">—</strong></div>
+          <div><span>完成最多記錄員</span><strong id="recordSearchTopPersonnel">—</strong></div>
         </div>
 
         <div class="record-breakdown-grid">
@@ -235,7 +260,10 @@
         </div>
 
         <div class="record-detail-actions">
-          <button id="toggleRecordSearchDetails" class="secondary" type="button">查看符合的牌靴明細</button>
+          <div class="record-detail-button-group">
+            <button id="toggleRecordSearchDetails" class="secondary" type="button">查看符合的牌靴明細</button>
+            <button id="exportRecordSearchCsv" class="secondary" type="button">匯出 CSV</button>
+          </div>
           <span id="recordSearchDetailCount" class="mini-badge">0 副</span>
         </div>
         <div id="recordSearchDetailList" class="admin-record-list record-search-detail-list hidden"></div>
@@ -350,6 +378,6 @@
       </div>
     </div>
   </div>
-<script type="module" src="app.js?v=16.10.1"></script>
+<script type="module" src="app.js?v=17.0"></script>
 </body>
 </html>
