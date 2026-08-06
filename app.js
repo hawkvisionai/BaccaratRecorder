@@ -92,7 +92,7 @@ window.addEventListener("load",()=>{
 
 setTimeout(forceFinishBrandIntro,BRAND_INTRO_FAILSAFE_MS);
 
-const APP_BUILD="17.1.3";
+const APP_BUILD="17.2";
 console.info("HawkVision Record Studio build",APP_BUILD);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
@@ -1156,6 +1156,122 @@ function toggleRecordSearchDetails(){
   $("toggleRecordSearchDetails").textContent=recordSearchDetailsVisible?"隱藏牌靴明細":"查看符合的牌靴明細";
 }
 
+
+function setHealthPill(id,state,text){
+  const el=$(id);
+  if(!el)return;
+  el.className=`health-pill ${state}`;
+  el.textContent=text;
+}
+function renderSystemHealth(data,userServiceOk,userServiceMessage){
+  const healthy=Boolean(data?.healthy)&&userServiceOk;
+  const overall=$("systemHealthOverall");
+  overall.className=`system-health-overall ${healthy?"healthy":"unhealthy"}`;
+  overall.querySelector(".health-status-icon").textContent=healthy?"✓":"!";
+  setTextSafe("systemHealthOverallTitle",healthy?"系統狀態正常":"系統發現異常");
+  setTextSafe("systemHealthOverallNote",healthy?"所有主要服務與分析資料均通過檢查":"請查看下方明細，必要時重建分析索引");
+
+  setHealthPill("healthDatabaseState","healthy","正常");
+  setTextSafe("healthDatabaseNote","已成功連線並取得最新健康狀態");
+
+  setHealthPill("healthIndexState",data?.index_table_exists&&Number(data?.missing_shoes||0)===0&&Number(data?.mismatch_shoes||0)===0?"healthy":"unhealthy",
+    data?.index_table_exists?"已建立":"未建立");
+  setTextSafe("healthIndexNote",data?.index_table_exists
+    ?`索引 ${Number(data.indexed_games||0).toLocaleString()} 局，應分析 ${Number(data.source_games||0).toLocaleString()} 局`
+    :"找不到分析索引資料表");
+
+  setHealthPill("healthTriggerState",data?.trigger_exists?"healthy":"unhealthy",data?.trigger_exists?"正常":"異常");
+  setTextSafe("healthTriggerNote",data?.trigger_exists?"新增或修改牌局時會自動同步分析索引":"找不到自動同步觸發器");
+
+  setHealthPill("healthRpcState",data?.analysis_rpc_exists?"healthy":"unhealthy",data?.analysis_rpc_exists?"正常":"異常");
+  setTextSafe("healthRpcNote",data?.analysis_rpc_exists?"全歷史搜尋函式已存在":"找不到全歷史搜尋函式");
+
+  setHealthPill("healthUserServiceState",userServiceOk?"healthy":"unhealthy",userServiceOk?"正常":"異常");
+  setTextSafe("healthUserServiceNote",userServiceMessage||"—");
+
+  setTextSafe("healthCompletedShoes",Number(data?.completed_shoes||0).toLocaleString());
+  setTextSafe("healthCompletedGames",Number(data?.completed_games||0).toLocaleString());
+  setTextSafe("healthSourceGames",Number(data?.source_games||0).toLocaleString());
+  setTextSafe("healthIndexedGames",Number(data?.indexed_games||0).toLocaleString());
+  setTextSafe("healthMissingShoes",Number(data?.missing_shoes||0).toLocaleString());
+  setTextSafe("healthMismatchShoes",Number(data?.mismatch_shoes||0).toLocaleString());
+  setTextSafe("healthCompleteness",`${Number(data?.completeness_percent||0).toFixed(2)}%`);
+  setTextSafe("healthCheckedAt",`檢查時間：${formatDate(data?.checked_at||new Date().toISOString())}`);
+
+  const issues=[];
+  if(!data?.index_table_exists)issues.push("分析索引資料表不存在。");
+  if(!data?.trigger_exists)issues.push("自動同步觸發器不存在或已停用。");
+  if(!data?.analysis_rpc_exists)issues.push("全歷史分析函式不存在。");
+  if(Number(data?.missing_shoes||0)>0)issues.push(`有 ${data.missing_shoes} 副牌靴尚未建立分析索引。`);
+  if(Number(data?.mismatch_shoes||0)>0)issues.push(`有 ${data.mismatch_shoes} 副牌靴的原始局數與分析索引不一致。`);
+  if(Number(data?.source_games||0)!==Number(data?.indexed_games||0))issues.push("應分析局數與已索引局數不一致。");
+  if(!userServiceOk)issues.push(`人員管理服務異常：${userServiceMessage||"無法連線"}`);
+
+  $("healthIssueList").innerHTML=issues.length
+    ?issues.map(x=>`<div class="health-issue-item"><span>!</span><p>${escapeHtml(x)}</p></div>`).join("")
+    :'<div class="health-success-item"><span>✓</span><p>沒有發現異常，所有已完成且結果為莊或閒的歷史牌局均已納入分析。</p></div>';
+
+  $("repairAnalysisIndexButton").classList.toggle("hidden",healthy||!isManager());
+}
+async function runSystemHealthCheck(){
+  $("systemHealthMessage").textContent="";
+  $("runSystemHealthButton").disabled=true;
+  $("runSystemHealthButton").textContent="檢查中…";
+  $("repairAnalysisIndexButton").classList.add("hidden");
+  $("systemHealthOverall").className="system-health-overall checking";
+  $("systemHealthOverall").querySelector(".health-status-icon").textContent="…";
+  setTextSafe("systemHealthOverallTitle","正在檢查");
+  setTextSafe("systemHealthOverallNote","正在比對資料庫與分析索引");
+
+  try{
+    const healthPromise=supabase.rpc("hawkvision_system_health");
+    const userServicePromise=callUserAdmin("list")
+      .then(r=>({ok:true,message:`已連線，可管理 ${Number((r.users||[]).length).toLocaleString()} 位人員`}))
+      .catch(e=>({ok:false,message:e.message||"無法連線"}));
+
+    const [healthResult,userService]=await Promise.all([healthPromise,userServicePromise]);
+    if(healthResult.error)throw healthResult.error;
+    renderSystemHealth(healthResult.data||{},userService.ok,userService.message);
+  }catch(e){
+    console.error(e);
+    $("systemHealthOverall").className="system-health-overall unhealthy";
+    $("systemHealthOverall").querySelector(".health-status-icon").textContent="!";
+    setTextSafe("systemHealthOverallTitle","無法完成檢查");
+    setTextSafe("systemHealthOverallNote","請確認已執行 v17.2 系統健康檢查 SQL");
+    setHealthPill("healthDatabaseState","unhealthy","異常");
+    setTextSafe("healthDatabaseNote",e.message||"資料庫回應失敗");
+    showMessage($("systemHealthMessage"),e.message||"系統健康檢查失敗","error");
+  }finally{
+    $("runSystemHealthButton").disabled=false;
+    $("runSystemHealthButton").textContent="重新檢查";
+  }
+}
+function openSystemHealth(){
+  if(!isManager())return;
+  $("systemHealthModal").classList.remove("hidden");
+  runSystemHealthCheck();
+}
+function closeSystemHealth(){
+  $("systemHealthModal").classList.add("hidden");
+}
+async function repairAnalysisIndex(){
+  if(!isManager())return;
+  if(!confirm("確定要重新建立全部歷史分析索引嗎？\n\n原始牌局不會被刪除，重建期間請稍候。"))return;
+  $("repairAnalysisIndexButton").disabled=true;
+  $("repairAnalysisIndexButton").textContent="重建中…";
+  try{
+    const {data,error}=await supabase.rpc("hawkvision_repair_analysis_index");
+    if(error)throw error;
+    showMessage($("systemHealthMessage"),`分析索引已重建，共處理 ${Number(data?.indexed_games||0).toLocaleString()} 局`,"success");
+    await runSystemHealthCheck();
+  }catch(e){
+    showMessage($("systemHealthMessage"),e.message||"重建分析索引失敗","error");
+  }finally{
+    $("repairAnalysisIndexButton").disabled=false;
+    $("repairAnalysisIndexButton").textContent="立即重建分析索引";
+  }
+}
+
 function isModalOpen(id){
   const el=$(id); return !!el && !el.classList.contains("hidden");
 }
@@ -1712,6 +1828,12 @@ $("dashboardButton").onclick=openDashboard;
 $("closeDashboardModal").onclick=closeDashboard;
 document.querySelector("[data-close-dashboard]").onclick=closeDashboard;
 $("refreshDashboardButton").onclick=()=>loadDashboard();
+$("openSystemHealthButton").onclick=openSystemHealth;
+$("closeSystemHealthModal").onclick=closeSystemHealth;
+document.querySelector("[data-close-system-health]").onclick=closeSystemHealth;
+$("runSystemHealthButton").onclick=runSystemHealthCheck;
+$("repairAnalysisIndexButton").onclick=repairAnalysisIndex;
+
 $("dashboardRecordSearchButton").onclick=searchDashboardRecords;
 $("dashboardRecordResetButton").onclick=resetDashboardRecordSearch;
 $("closeDashboardSearchResults").onclick=closeDashboardSearchResultsPanel;
@@ -1731,7 +1853,7 @@ $("closeInactiveUsersModal").onclick=()=>{$("inactiveUsersModal").classList.add(
 document.querySelector("[data-close-inactive-users]").onclick=()=>{$("inactiveUsersModal").classList.add("hidden")};
 $("inactiveUserSearch").oninput=renderInactiveUsers;
 $("undoButton").onclick=deleteLastGame;$("refreshButton").onclick=async()=>{try{await Promise.all([loadCloudData(),loadVenues()])}catch(e){showMessage(appMessage,e.message||"重新整理失敗","error")}};$("loginButton").onclick=login;$("logoutButton").onclick=logout;
-document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("shoeDetailModal").classList.contains("hidden"))return closeDetailModal();if(!$("managementListModal").classList.contains("hidden"))return closeManagementList();if(!$("personnelDetailModal").classList.contains("hidden"))return closePersonnelDetail();if(!$("personnelStatsModal").classList.contains("hidden"))return closePersonnelStats();if(!$("finishedHistoryModal").classList.contains("hidden"))return closeFinishedHistory();if(!$("myRecentShoesModal").classList.contains("hidden"))return closeMyRecentShoes();if(!$("dashboardModal").classList.contains("hidden"))return closeDashboard();if(!$("userManagerModal").classList.contains("hidden"))return closeUserManager();if(!$("editShoeModal").classList.contains("hidden"))return closeEditModal();if(!$("shoeManagerModal").classList.contains("hidden"))return closeManagerModal();if(!$("newShoeModal").classList.contains("hidden"))return closeShoeModal()}if(e.key==="Enter"&&!loginPanel.classList.contains("hidden"))login()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("shoeDetailModal").classList.contains("hidden"))return closeDetailModal();if(!$("managementListModal").classList.contains("hidden"))return closeManagementList();if(!$("personnelDetailModal").classList.contains("hidden"))return closePersonnelDetail();if(!$("personnelStatsModal").classList.contains("hidden"))return closePersonnelStats();if(!$("finishedHistoryModal").classList.contains("hidden"))return closeFinishedHistory();if(!$("myRecentShoesModal").classList.contains("hidden"))return closeMyRecentShoes();if(!$("systemHealthModal").classList.contains("hidden"))return closeSystemHealth();if(!$("dashboardModal").classList.contains("hidden"))return closeDashboard();if(!$("userManagerModal").classList.contains("hidden"))return closeUserManager();if(!$("editShoeModal").classList.contains("hidden"))return closeEditModal();if(!$("shoeManagerModal").classList.contains("hidden"))return closeManagerModal();if(!$("newShoeModal").classList.contains("hidden"))return closeShoeModal()}if(e.key==="Enter"&&!loginPanel.classList.contains("hidden"))login()});
 
 syncNextRoundPlacement();renderCardInput();updateWinnerOnlyUI();updateRecordState();
 supabase.auth.onAuthStateChange(async(_event,session)=>session?await showAuthenticated(session):showLoggedOut());

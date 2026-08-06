@@ -858,3 +858,66 @@ body:not(.brand-intro-active) .container{
     grid-template-columns:1fr 1fr;
   }
 }
+
+
+/* v17.2｜系統健康檢查中心 */
+.system-health-card{width:min(1040px,94vw);max-height:92vh;overflow:auto}
+.system-health-overall{
+  display:flex;align-items:center;gap:14px;padding:16px;border:1px solid var(--line);
+  border-radius:16px;background:var(--card2);margin:10px 0 12px;
+}
+.system-health-overall .health-status-icon{
+  display:grid;place-items:center;width:46px;height:46px;border-radius:50%;
+  font-size:24px;font-weight:950;background:#263244;
+}
+.system-health-overall div{display:grid;gap:4px}
+.system-health-overall strong{font-size:18px}
+.system-health-overall small{color:var(--muted)}
+.system-health-overall.healthy{border-color:rgba(34,197,94,.45);background:rgba(22,101,52,.12)}
+.system-health-overall.healthy .health-status-icon{background:#166534;color:#dcfce7}
+.system-health-overall.unhealthy{border-color:rgba(239,68,68,.5);background:rgba(127,29,29,.12)}
+.system-health-overall.unhealthy .health-status-icon{background:#991b1b;color:#fee2e2}
+.system-health-overall.checking .health-status-icon{animation:healthPulse 1s infinite alternate}
+@keyframes healthPulse{from{opacity:.45}to{opacity:1}}
+.system-health-actions{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:12px}
+.system-health-grid{
+  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px;margin-bottom:12px;
+}
+.health-check-card{
+  min-width:0;padding:12px;border:1px solid var(--line);border-radius:13px;background:#0a1423;
+}
+.health-check-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px}
+.health-check-head span{font-size:12px;font-weight:850}
+.health-check-card small{display:block;color:var(--muted);line-height:1.45}
+.health-pill{padding:4px 7px;border-radius:999px;font-size:10px;white-space:nowrap}
+.health-pill.waiting{background:#334155;color:#e2e8f0}
+.health-pill.healthy{background:#166534;color:#dcfce7}
+.health-pill.unhealthy{background:#991b1b;color:#fee2e2}
+.system-health-metrics{
+  display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:9px;margin-bottom:12px;
+}
+.system-health-metrics>div{
+  padding:12px 8px;border:1px solid var(--line);border-radius:13px;background:var(--card2);text-align:center;
+}
+.system-health-metrics span,.system-health-metrics small{display:block;color:var(--muted)}
+.system-health-metrics span{font-size:11px;font-weight:800;min-height:2.4em}
+.system-health-metrics strong{display:block;font-size:23px;margin:5px 0 2px}
+.health-detail-panel{padding:13px;border:1px solid var(--line);border-radius:14px;background:#0a1423}
+.health-issue-list{display:grid;gap:8px}
+.health-issue-item,.health-success-item{
+  display:flex;align-items:flex-start;gap:9px;padding:10px;border-radius:10px;
+}
+.health-issue-item{background:rgba(127,29,29,.16);color:#fecaca}
+.health-success-item{background:rgba(22,101,52,.16);color:#dcfce7}
+.health-issue-item span,.health-success-item span{font-weight:950}
+.health-issue-item p,.health-success-item p{margin:0;line-height:1.5}
+@media(max-width:1100px){
+  .system-health-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .system-health-metrics{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media(max-width:700px){
+  .system-health-grid{grid-template-columns:1fr}
+  .system-health-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .system-health-actions{display:grid;grid-template-columns:1fr}
+  .dashboard-head-actions{flex-wrap:wrap}
+}
