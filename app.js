@@ -92,7 +92,7 @@ window.addEventListener("load",()=>{
 
 setTimeout(forceFinishBrandIntro,BRAND_INTRO_FAILSAFE_MS);
 
-const APP_BUILD="17.1.2";
+const APP_BUILD="17.1.3";
 console.info("HawkVision Record Studio build",APP_BUILD);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
@@ -143,6 +143,8 @@ let managementGamesOffset = 0;
 let recordSearchData = [];
 let recordSearchDetailsVisible = false;
 let recordSearchRange = null;
+const pendingWorkdaySaves=new Map();
+let workdaySaveSequence=0;
 
 function setTextSafe(id,value){
   const el=$(id);
@@ -1481,7 +1483,16 @@ async function callUserAdmin(action,payload={}){
   if(!response.ok) throw new Error(result.error||`人員管理服務錯誤（${response.status}）`);
   return result;
 }
-function closeUserManager(){if(!busy)$("userManagerModal").classList.add("hidden")}
+async function closeUserManager(){
+  if(busy)return;
+  setBusy(true);
+  try{
+    await flushPendingWorkdayControls();
+    $("userManagerModal").classList.add("hidden");
+  }finally{
+    setBusy(false);
+  }
+}
 async function openUserManager(){
   if(!isManager())return;
   $("userManagerModal").classList.remove("hidden");
@@ -1510,7 +1521,14 @@ function userManagerCard(u){
     <span class="role-badge ${owner||coadmin?"admin":"recorder"}">${roleLabel(u.role)}</span>
     <span class="account-state ${active?"active":"disabled"}">${active?"啟用":"停用"}</span>
     <label class="workday-setting">一日開始
-      <input type="time" data-user-workday="${u.id}" value="${escapeHtml(normalizeWorkdayTime(u.workday_start))}" ${canManage?"":"disabled"} />
+      <span class="workday-selects" data-workday-group="${u.id}">
+        <select data-workday-hour="${u.id}" ${canManage?"":"disabled"} aria-label="一日開始小時">
+          ${Array.from({length:24},(_,h)=>`<option value="${String(h).padStart(2,"0")}" ${normalizeWorkdayTime(u.workday_start).slice(0,2)===String(h).padStart(2,"0")?"selected":""}>${String(h).padStart(2,"0")} 時</option>`).join("")}
+        </select>
+        <select data-workday-minute="${u.id}" ${canManage?"":"disabled"} aria-label="一日開始分鐘">
+          ${["00","10","20","30","40","50"].map(m=>`<option value="${m}" ${normalizeWorkdayTime(u.workday_start).slice(3,5)===m?"selected":""}>${m} 分</option>`).join("")}
+        </select>
+      </span>
     </label>
     <div class="ai-permission"><span>AI 辨識</span><i class="permission-light ${ai?"on":"off"}"></i></div>
     <div class="user-actions">
@@ -1543,8 +1561,21 @@ function renderManagedUsers(){
 }
 function bindManagedUserActions(){
   document.querySelectorAll("[data-user-action]").forEach(b=>b.onclick=()=>handleManagedUserAction(b.dataset.userAction,b.dataset.id));
-  document.querySelectorAll("[data-user-workday]").forEach(input=>{
-    input.onchange=()=>handleManagedUserAction("save_workday",input.dataset.userWorkday);
+
+  document.querySelectorAll("[data-workday-hour],[data-workday-minute]").forEach(control=>{
+    control.onchange=async()=>{
+      const id=control.dataset.workdayHour||control.dataset.workdayMinute;
+      control.disabled=true;
+      const mateHour=document.querySelector(`[data-workday-hour="${id}"]`);
+      const mateMinute=document.querySelector(`[data-workday-minute="${id}"]`);
+      if(mateHour)mateHour.disabled=true;
+      if(mateMinute)mateMinute.disabled=true;
+
+      await saveWorkdayImmediately(id);
+
+      if(mateHour)mateHour.disabled=false;
+      if(mateMinute)mateMinute.disabled=false;
+    };
   });
 }
 function renderInactiveUsers(){
@@ -1563,30 +1594,65 @@ async function createManagedUser(){
   setBusy(true);try{await callUserAdmin("create",{display_name,username,password});$("newUserName").value="";$("newUsername").value="";$("newUserPassword").value="";showSaveToast("✓ 記錄員已建立");await loadManagedUsers()}
   catch(e){showMessage($("userManagerMessage"),e.message||"建立失敗","error")}finally{setBusy(false)}
 }
+function getWorkdayValueFromControls(id){
+  const hour=document.querySelector(`[data-workday-hour="${id}"]`)?.value||"00";
+  const minute=document.querySelector(`[data-workday-minute="${id}"]`)?.value||"00";
+  return normalizeWorkdayTime(`${hour}:${minute}`);
+}
+
+function updateWorkdaySearchOption(id,workday_start){
+  const select=$("dashboardRecordPersonnel");
+  if(!select)return;
+  const option=[...select.options].find(o=>String(o.value)===String(id));
+  if(option)option.dataset.workday=normalizeWorkdayTime(workday_start);
+}
+
+async function saveWorkdayImmediately(id,{silent=false}={}){
+  const workday_start=getWorkdayValueFromControls(id);
+  const seq=++workdaySaveSequence;
+  pendingWorkdaySaves.set(String(id),seq);
+
+  try{
+    await callUserAdmin("set_workday",{user_id:id,workday_start});
+    const verify=await callUserAdmin("list");
+    managedUsers=verify.users||[];
+    const saved=managedUsers.find(x=>String(x.id)===String(id));
+    if(normalizeWorkdayTime(saved?.workday_start)!==workday_start){
+      throw new Error("儲存驗證失敗，請再試一次");
+    }
+
+    updateWorkdaySearchOption(id,workday_start);
+    if(!silent)showSaveToast(`✓ 一日開始時間已儲存：${workday_start}`);
+    return true;
+  }catch(e){
+    showMessage($("userManagerMessage"),e.message||"時間更新失敗","error");
+    return false;
+  }finally{
+    if(pendingWorkdaySaves.get(String(id))===seq)pendingWorkdaySaves.delete(String(id));
+  }
+}
+
+async function flushPendingWorkdayControls(){
+  const groups=[...document.querySelectorAll("[data-workday-group]")];
+  const tasks=[];
+  for(const group of groups){
+    const id=group.dataset.workdayGroup;
+    const original=managedUsers.find(u=>String(u.id)===String(id));
+    const current=getWorkdayValueFromControls(id);
+    if(original && normalizeWorkdayTime(original.workday_start)!==current){
+      tasks.push(saveWorkdayImmediately(id,{silent:true}));
+    }
+  }
+  if(tasks.length)await Promise.all(tasks);
+}
+
 async function handleManagedUserAction(action,id){
   const user=managedUsers.find(u=>u.id===id);if(!user||user.role==="admin"||user.id===currentUser?.id)return;
   if(action==="save_workday"){
-    const input=document.querySelector(`[data-user-workday="${id}"]`);
-    const workday_start=normalizeWorkdayTime(input?.value);
     setBusy(true);
     try{
-      await callUserAdmin("set_workday",{user_id:id,workday_start});
-
-      // 立即從後端回讀確認，不再只依賴畫面暫存值。
-      const verify=await callUserAdmin("list");
-      managedUsers=verify.users||[];
-      const saved=managedUsers.find(x=>String(x.id)===String(id));
-      if(normalizeWorkdayTime(saved?.workday_start)!==workday_start){
-        throw new Error("後端未回傳剛儲存的時間，請重新操作");
-      }
-
-      const searchOption=[...$("dashboardRecordPersonnel")?.options||[]].find(o=>String(o.value)===String(id));
-      if(searchOption)searchOption.dataset.workday=workday_start;
-
-      showSaveToast(`✓ 一日開始時間已儲存：${workday_start}`);
+      await saveWorkdayImmediately(id);
       renderManagedUsers();
-    }catch(e){
-      showMessage($("userManagerMessage"),e.message||"時間更新失敗","error");
     }finally{
       setBusy(false);
     }
