@@ -92,7 +92,7 @@ window.addEventListener("load",()=>{
 
 setTimeout(forceFinishBrandIntro,BRAND_INTRO_FAILSAFE_MS);
 
-const APP_BUILD="17.3.3";
+const APP_BUILD="17.3.4";
 
 function syncVisibleAppVersion(){
   const el=document.getElementById("appVersionBadge");
