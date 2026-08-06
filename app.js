@@ -92,7 +92,7 @@ window.addEventListener("load",()=>{
 
 setTimeout(forceFinishBrandIntro,BRAND_INTRO_FAILSAFE_MS);
 
-const APP_BUILD="17.3.1";
+const APP_BUILD="17.3.2";
 console.info("HawkVision Record Studio build",APP_BUILD);
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
@@ -153,6 +153,9 @@ let correctionEditingGame=null;
 let correctionEditorMode="update";
 let correctionInputMode="full";
 let correctionWinnerOnlyValue=null;
+let correctionWinnerOnlyPlayerPair=false;
+let correctionWinnerOnlyBankerPair=false;
+let correctionWinnerOnlyLuckySix=false;
 let correctionCardState={player:[null,null,null],banker:[null,null,null]};
 let correctionSelectedSlot={side:"player",index:0};
 let correctionLockHeartbeat=null;
@@ -593,13 +596,16 @@ function correctionDerived(){
 function correctionPayload(){
   if(correctionInputMode==="winner_only"){
     if(!["莊","閒","和"].includes(correctionWinnerOnlyValue))return null;
+    if(correctionWinnerOnlyLuckySix && correctionWinnerOnlyValue!=="莊")return null;
     return {
       winner:correctionWinnerOnlyValue,
       input_method:"winner_only_correction",
       banker_points:null,player_points:null,difference:null,
-      banker_pair:false,player_pair:false,
+      banker_pair:correctionWinnerOnlyBankerPair,
+      player_pair:correctionWinnerOnlyPlayerPair,
       banker_card_count:null,player_card_count:null,
-      banker_natural:false,player_natural:false,super_six:false,
+      banker_natural:false,player_natural:false,
+      super_six:correctionWinnerOnlyLuckySix,
       player_card_1:null,player_card_2:null,player_card_3:null,
       banker_card_1:null,banker_card_2:null,banker_card_3:null
     };
@@ -640,12 +646,38 @@ function renderCorrectionEditor(){
       b.classList.toggle("selected",b.dataset.correctionWinner===correctionWinnerOnlyValue);
       b.onclick=()=>{
         correctionWinnerOnlyValue=b.dataset.correctionWinner;
+        if(correctionWinnerOnlyValue!=="莊")correctionWinnerOnlyLuckySix=false;
         renderCorrectionEditor();
       };
     });
-    $("correctionDerivedSummary").className=`correction-derived-summary ${correctionWinnerOnlyValue?"valid":"invalid"}`;
+
+    $("correctionPlayerPair").checked=correctionWinnerOnlyPlayerPair;
+    $("correctionBankerPair").checked=correctionWinnerOnlyBankerPair;
+    $("correctionLuckySix").checked=correctionWinnerOnlyLuckySix;
+    $("correctionLuckySix").disabled=correctionWinnerOnlyValue!=="莊";
+
+    $("correctionPlayerPair").onchange=e=>{
+      correctionWinnerOnlyPlayerPair=e.target.checked;
+      renderCorrectionEditor();
+    };
+    $("correctionBankerPair").onchange=e=>{
+      correctionWinnerOnlyBankerPair=e.target.checked;
+      renderCorrectionEditor();
+    };
+    $("correctionLuckySix").onchange=e=>{
+      correctionWinnerOnlyLuckySix=e.target.checked;
+      renderCorrectionEditor();
+    };
+
+    const valid=Boolean(correctionWinnerOnlyValue) && (!correctionWinnerOnlyLuckySix || correctionWinnerOnlyValue==="莊");
+    const extras=[
+      correctionWinnerOnlyPlayerPair?"閒對":null,
+      correctionWinnerOnlyBankerPair?"莊對":null,
+      correctionWinnerOnlyLuckySix?"幸運六":null
+    ].filter(Boolean);
+    $("correctionDerivedSummary").className=`correction-derived-summary ${valid?"valid":"invalid"}`;
     $("correctionDerivedSummary").innerHTML=correctionWinnerOnlyValue
-      ?`<strong>${correctionWinnerOnlyValue==="和"?"和局":`${correctionWinnerOnlyValue}贏`}</strong><span>只記勝方模式，不保存牌面與點數</span>`
+      ?`<strong>${correctionWinnerOnlyValue==="和"?"和局":`${correctionWinnerOnlyValue}贏`}</strong><span>只記勝方${extras.length?`｜${extras.join("、")}`:""}｜不保存牌面與點數</span>`
       :`<strong>尚未完成</strong><span>請選擇莊、閒或和</span>`;
     return;
   }
@@ -765,6 +797,10 @@ function openGameCorrectionEditor(modeName,game=null){
   correctionSelectedSlot={side:"player",index:0};
   correctionInputMode=(game && !game.player_card_1 && !game.banker_card_1)?"winner_only":"full";
   correctionWinnerOnlyValue=game?.winner||null;
+  correctionWinnerOnlyPlayerPair=game?.player_pair===true;
+  correctionWinnerOnlyBankerPair=game?.banker_pair===true;
+  correctionWinnerOnlyLuckySix=game?.super_six===true;
+  if(correctionWinnerOnlyValue!=="莊")correctionWinnerOnlyLuckySix=false;
   if(game){
     correctionCardState={
       player:[game.player_card_1||null,game.player_card_2||null,game.player_card_3||null],
@@ -792,7 +828,9 @@ function closeGameCorrectionEditor(){
 async function saveGameCorrection(){
   const payload=correctionPayload();
   if(!payload){
-    const message=correctionInputMode==="winner_only"?"請先選擇莊、閒或和":correctionProgress().message;
+    const message=correctionInputMode==="winner_only"
+      ?(correctionWinnerOnlyLuckySix&&correctionWinnerOnlyValue!=="莊"?"幸運六只能搭配莊贏":"請先選擇莊、閒或和")
+      :correctionProgress().message;
     return showMessage($("gameCorrectionEditorMessage"),message,"error");
   }
   const position=correctionEditorMode==="insert"?Number($("correctionInsertPosition").value):Number(correctionEditingGame?.game_number);
