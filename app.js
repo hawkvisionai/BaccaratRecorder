@@ -92,7 +92,7 @@ window.addEventListener("load",()=>{
 
 setTimeout(forceFinishBrandIntro,BRAND_INTRO_FAILSAFE_MS);
 
-const APP_BUILD="17.3.6";
+const APP_BUILD="17.3.7";
 
 function syncVisibleAppVersion(){
   const el=document.getElementById("appVersionBadge");
@@ -760,7 +760,12 @@ async function acquireCorrectionLock(shoeId){
   setTextSafe("shoeCorrectionLockState","已取得修正鎖定");
   $("shoeCorrectionLockState").className="correction-lock-state locked";
   clearInterval(correctionLockHeartbeat);
-  correctionLockHeartbeat=setInterval(()=>supabase.rpc("renew_shoe_correction_lock",{p_lock_token:correctionLockToken}).catch(()=>{}),60000);
+  correctionLockHeartbeat=setInterval(async()=>{
+    try{
+      const {error}=await supabase.rpc("renew_shoe_correction_lock",{p_lock_token:correctionLockToken});
+      if(error)console.warn("renew correction lock failed:",error);
+    }catch(_){}
+  },60000);
 }
 async function releaseCorrectionLock(){
   clearInterval(correctionLockHeartbeat);correctionLockHeartbeat=null;
@@ -862,7 +867,7 @@ async function saveGameCorrection(){
     await openShoeManager();
     if(wasInsert){
       openGameCorrectionEditor("insert");
-      if(previousInsertInputMode==="winner"){
+      if(previousInsertInputMode==="winner_only"){
         setCorrectionInputMode("winner");
       }else{
         setCorrectionInputMode("full");
