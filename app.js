@@ -92,7 +92,7 @@ window.addEventListener("load",()=>{
 
 setTimeout(forceFinishBrandIntro,BRAND_INTRO_FAILSAFE_MS);
 
-const APP_BUILD="17.3.7";
+const APP_BUILD="17.3.8";
 
 function syncVisibleAppVersion(){
   const el=document.getElementById("appVersionBadge");
@@ -868,7 +868,7 @@ async function saveGameCorrection(){
     if(wasInsert){
       openGameCorrectionEditor("insert");
       if(previousInsertInputMode==="winner_only"){
-        setCorrectionInputMode("winner");
+        setCorrectionInputMode("winner_only");
       }else{
         setCorrectionInputMode("full");
       }
