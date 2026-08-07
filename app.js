@@ -92,7 +92,7 @@ window.addEventListener("load",()=>{
 
 setTimeout(forceFinishBrandIntro,BRAND_INTRO_FAILSAFE_MS);
 
-const APP_BUILD="17.3.5";
+const APP_BUILD="17.3.6";
 
 function syncVisibleAppVersion(){
   const el=document.getElementById("appVersionBadge");
@@ -855,12 +855,18 @@ async function saveGameCorrection(){
     if(error)throw error;
     const wasInsert=correctionEditorMode==="insert";
     const nextPosition=position+1;
+    const previousInsertInputMode=correctionInputMode;
     closeGameCorrectionEditor();
     await reloadCorrectionGames();
     showMessage($("shoeCorrectionMessage"),`修正完成，分析與搜尋資料已同步（索引 ${Number(data?.indexed_games||0).toLocaleString()} 局）`,"success");
     await openShoeManager();
     if(wasInsert){
       openGameCorrectionEditor("insert");
+      if(previousInsertInputMode==="winner"){
+        setCorrectionInputMode("winner");
+      }else{
+        setCorrectionInputMode("full");
+      }
       $("correctionInsertPosition").value=String(Math.min(nextPosition,correctionGames.length+1));
     }
   }catch(e){
