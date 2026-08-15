@@ -92,7 +92,7 @@ window.addEventListener("load",()=>{
 
 setTimeout(forceFinishBrandIntro,BRAND_INTRO_FAILSAFE_MS);
 
-const APP_BUILD="17.4.0";
+const APP_BUILD="17.4.1";
 
 function syncVisibleAppVersion(){
   const el=document.getElementById("appVersionBadge");
@@ -105,22 +105,44 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const SUPABASE_URL = "https://rwxujvpakpemiwkitltk.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_aN_1_fzAV3hR6FmW7FTZGg_6SF0MUHF";
 
-const HAWKVISION_AUTH_COOKIE="hv-sso-auth-v1";
-const hawkvisionCookieStorage={
-  getItem(key){
-    const prefix=encodeURIComponent(key)+"=";
-    const row=document.cookie.split("; ").find(v=>v.startsWith(prefix));
-    return row?decodeURIComponent(row.slice(prefix.length)):null;
-  },
-  setItem(key,value){
-    document.cookie=`${encodeURIComponent(key)}=${encodeURIComponent(value)}; Domain=.hawkvisionai.com; Path=/; Max-Age=2592000; SameSite=Lax; Secure`;
-  },
-  removeItem(key){
-    document.cookie=`${encodeURIComponent(key)}=; Domain=.hawkvisionai.com; Path=/; Max-Age=0; SameSite=Lax; Secure`;
-  }
-};
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY,{auth:{storage:hawkvisionCookieStorage,storageKey:HAWKVISION_AUTH_COOKIE,persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+const HV_ACTIVE_COOKIE="hv-active-user";
+function hvSetActiveUser(userId){
+  document.cookie=`${HV_ACTIVE_COOKIE}=${encodeURIComponent(userId||"")}; Domain=.hawkvisionai.com; Path=/; Max-Age=2592000; SameSite=Lax; Secure`;
+}
+function hvGetActiveUser(){
+  const p=HV_ACTIVE_COOKIE+"=";
+  const row=document.cookie.split("; ").find(v=>v.startsWith(p));
+  return row?decodeURIComponent(row.slice(p.length)):"";
+}
+function hvClearActiveUser(){
+  document.cookie=`${HV_ACTIVE_COOKIE}=; Domain=.hawkvisionai.com; Path=/; Max-Age=0; SameSite=Lax; Secure`;
+}
+async function hvAcceptSso(client){
+  const hash=new URLSearchParams(location.hash.replace(/^#/,""));
+  const access_token=hash.get("hv_at");
+  const refresh_token=hash.get("hv_rt");
+  if(access_token&&refresh_token){
+    const {data,error}=await client.auth.setSession({access_token,refresh_token});
+    history.replaceState(null,"",location.pathname+location.search);
+    if(error)throw error;
+    if(data?.user)hvSetActiveUser(data.user.id);
+    return data?.session||null;
+  }
+  return null;
+}
+async function hvValidateActiveIdentity(client,session){
+  const active=hvGetActiveUser();
+  if(!session?.user)return false;
+  if(active && active!==session.user.id){
+    await client.auth.signOut({scope:"local"}).catch(()=>{});
+    return false;
+  }
+  hvSetActiveUser(session.user.id);
+  return true;
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 const USER_ADMIN_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/manage-users`;
 const AI_CAPTURE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/analyze-capture`;
 const $ = id => document.getElementById(id);
@@ -1776,7 +1798,7 @@ async function login(){
   catch{showMessage(loginMessage,"登入失敗，請確認帳號或密碼","error")}
   finally{setBusy(false)}
 }
-async function logout(){await supabase.auth.signOut({scope:"global"}).catch(()=>{});window.location.href="https://hawkvisionai.com/"}
+async function logout(){await supabase.auth.signOut({scope:"global"}).catch(()=>{});hvClearActiveUser();window.location.href="https://hawkvisionai.com/"}
 async function loadCurrentProfile(user){
   const [{data,error},{data:hasRecordAccess,error:accessError}]=await Promise.all([
     supabase.from("profiles").select("id,email,username,display_name,role,is_active,ai_capture_enabled,workday_start").eq("id",user.id).maybeSingle(),
@@ -2278,8 +2300,9 @@ $("undoButton").onclick=deleteLastGame;$("refreshButton").onclick=async()=>{try{
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("gameCorrectionEditorModal").classList.contains("hidden"))return closeGameCorrectionEditor();if(!$("correctionHistoryModal").classList.contains("hidden"))return closeCorrectionHistory();if(!$("shoeCorrectionModal").classList.contains("hidden"))return closeShoeCorrection();if(!$("shoeDetailModal").classList.contains("hidden"))return closeDetailModal();if(!$("managementListModal").classList.contains("hidden"))return closeManagementList();if(!$("personnelDetailModal").classList.contains("hidden"))return closePersonnelDetail();if(!$("personnelStatsModal").classList.contains("hidden"))return closePersonnelStats();if(!$("finishedHistoryModal").classList.contains("hidden"))return closeFinishedHistory();if(!$("myRecentShoesModal").classList.contains("hidden"))return closeMyRecentShoes();if(!$("systemHealthModal").classList.contains("hidden"))return closeSystemHealth();if(!$("dashboardModal").classList.contains("hidden"))return closeDashboard();if(!$("userManagerModal").classList.contains("hidden"))return closeUserManager();if(!$("editShoeModal").classList.contains("hidden"))return closeEditModal();if(!$("shoeManagerModal").classList.contains("hidden"))return closeManagerModal();if(!$("newShoeModal").classList.contains("hidden"))return closeShoeModal()}if(e.key==="Enter"&&!loginPanel.classList.contains("hidden"))login()});
 
 syncNextRoundPlacement();renderCardInput();updateWinnerOnlyUI();updateRecordState();
+await hvAcceptSso(supabase).catch(()=>{});
 supabase.auth.onAuthStateChange(async(_event,session)=>session?await showAuthenticated(session):showLoggedOut());
-const {data:{session}}=await supabase.auth.getSession();if(session)await showAuthenticated(session);else showLoggedOut();
+const {data:{session}}=await supabase.auth.getSession();if(session && await hvValidateActiveIdentity(supabase,session))await showAuthenticated(session);else window.location.replace("https://hawkvisionai.com/");
 
 if(document.readyState==="loading"){
   document.addEventListener("DOMContentLoaded",syncVisibleAppVersion,{once:true});
@@ -2287,5 +2310,3 @@ if(document.readyState==="loading"){
   syncVisibleAppVersion();
 }
 
-
-document.getElementById("hawkvisionHomeButton")?.addEventListener("click",()=>{window.location.href="https://hawkvisionai.com/"});
