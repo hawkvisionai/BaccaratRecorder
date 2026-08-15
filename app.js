@@ -92,7 +92,7 @@ window.addEventListener("load",()=>{
 
 setTimeout(forceFinishBrandIntro,BRAND_INTRO_FAILSAFE_MS);
 
-const APP_BUILD="17.3.8";
+const APP_BUILD="17.3.9";
 
 function syncVisibleAppVersion(){
   const el=document.getElementById("appVersionBadge");
@@ -1197,13 +1197,14 @@ function renderFinishedHistory(){
   document.querySelectorAll("#finishedHistoryList [data-admin-shoe-id]").forEach(b=>b.onclick=async()=>{const s=finishedHistoryData.find(x=>String(x.id)===String(b.dataset.adminShoeId));if(s)await viewShoe(s)});
 }
 async function loadPersonnelStatsData(){
-  const [pr,sr]=await Promise.all([
-    supabase.from("profiles").select("id,display_name,username,email,role,is_active").order("display_name",{ascending:true}),
+  const [userResult,sr]=await Promise.all([
+    callUserAdmin("list"),
     supabase.from("shoes").select("id,owner_id,finished_at").not("finished_at","is",null).eq("is_archived",false)
   ]);
-  if(pr.error)throw pr.error;if(sr.error)throw sr.error;
+  if(sr.error)throw sr.error;
+  const people=userResult?.users||[];
   const now=Date.now(),d7=now-7*86400000,d30=now-30*86400000,shoes=sr.data||[];
-  personnelStatsData=(pr.data||[]).map(p=>{
+  personnelStatsData=people.map(p=>{
     const own=shoes.filter(s=>String(s.owner_id)===String(p.id)).sort((a,b)=>new Date(b.finished_at)-new Date(a.finished_at));
     return {...p,total:own.length,last7:own.filter(s=>new Date(s.finished_at).getTime()>=d7).length,last30:own.filter(s=>new Date(s.finished_at).getTime()>=d30).length,lastFinished:own[0]?.finished_at||null};
   }).sort((a,b)=>b.last30-a.last30||b.total-a.total||(a.display_name||a.username||"").localeCompare(b.display_name||b.username||"","zh-Hant"));
@@ -1761,10 +1762,21 @@ async function login(){
 }
 async function logout(){await supabase.auth.signOut()}
 async function loadCurrentProfile(user){
-  const {data,error}=await supabase.from("profiles").select("id,email,username,display_name,role,is_active,ai_capture_enabled,workday_start").eq("id",user.id).maybeSingle();
+  const [{data,error},{data:hasRecordAccess,error:accessError}]=await Promise.all([
+    supabase.from("profiles").select("id,email,username,display_name,role,is_active,ai_capture_enabled,workday_start").eq("id",user.id).maybeSingle(),
+    supabase.rpc("hv_has_product_access",{p_user_id:user.id,p_product_key:"record_platform"})
+  ]);
   if(error) throw error;
-  if(!data) throw new Error("找不到使用者資料，請先執行 v16.1.0 資料庫升級 SQL");
-  if(data.is_active===false){await supabase.auth.signOut();throw new Error("此帳號已被停用，請聯絡管理員");}
+  if(accessError) throw accessError;
+  if(!data) throw new Error("找不到使用者資料，請聯絡管理員");
+  if(data.is_active===false){
+    await supabase.auth.signOut();
+    throw new Error("此帳號已被停用，請聯絡管理員");
+  }
+  if(hasRecordAccess!==true){
+    await supabase.auth.signOut();
+    throw new Error("此帳號沒有記錄平台使用權限");
+  }
   return data;
 }
 function applyRoleUI(){
