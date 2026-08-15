@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="style.css?v=17.3.9" />
 </head>
 <body>
-  <div id="appVersionBadge" class="app-version-badge" aria-label="目前版本">v17.4.2</div>
+  <div id="appVersionBadge" class="app-version-badge" aria-label="目前版本">v17.4.3</div>
   <main class="container">
     <header class="topbar">
       <div class="brand-lockup">
@@ -25,11 +25,11 @@
         <div class="user-meta"><strong id="userDisplayName">—</strong><span id="userRoleBadge" class="role-badge">—</span></div>
         <button id="dashboardButton" class="primary hidden" type="button">管理總覽</button>
         <button id="userManagerButton" class="warning hidden" type="button">人員管理</button>
-        <a id="hawkvisionHomeButton" class="secondary" href="https://hawkvisionai.com/" style="text-decoration:none;display:inline-flex;align-items:center;pointer-events:auto;position:relative;z-index:3">返回 HawkVision</a><button id="logoutButton" class="secondary" type="button">登出</button>
+        <a id="hawkvisionHomeButton" class="secondary" href="https://hawkvisionai.com/" style="text-decoration:none;display:inline-flex;align-items:center;pointer-events:auto;position:relative;z-index:3;background:#f8fafc;color:#0f172a;border:2px solid #f8fafc;font-weight:800;box-shadow:0 0 0 1px rgba(15,23,42,.18),0 4px 14px rgba(0,0,0,.22)">返回 HawkVision</a><button id="logoutButton" class="secondary" type="button">登出</button>
       </div>
     </header>
 
-    <section id="loginPanel" class="card login-card">
+    <section id="loginPanel" class="card login-card hidden" aria-hidden="true">
       <div class="login-brand">
         <img src="hawkvision-logo.png" alt="" class="login-logo" />
         <div>
@@ -566,6 +566,6 @@
       </div>
     </div>
   </div>
-<script type="module" src="app.js?v=17.4.2"></script>
+<script type="module" src="app.js?v=17.4.3"></script>
 </body>
 </html>

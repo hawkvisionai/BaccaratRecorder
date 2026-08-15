@@ -1,4 +1,4 @@
-const APP_BUILD="17.4.2";
+const APP_BUILD="17.4.3";
 
 function syncVisibleAppVersion(){
   const el=document.getElementById("appVersionBadge");
@@ -1704,7 +1704,11 @@ async function login(){
   catch{showMessage(loginMessage,"登入失敗，請確認帳號或密碼","error")}
   finally{setBusy(false)}
 }
-async function logout(){await supabase.auth.signOut({scope:"global"}).catch(()=>{});hvClearActiveUser();window.location.href="https://hawkvisionai.com/"}
+async function logout(){
+  await supabase.auth.signOut({scope:"global"}).catch(()=>{});
+  hvClearActiveUser();
+  window.location.replace("https://hawkvisionai.com/?logout=1");
+}
 async function loadCurrentProfile(user){
   const [{data,error},{data:hasRecordAccess,error:accessError}]=await Promise.all([
     supabase.from("profiles").select("id,email,username,display_name,role,is_active,ai_capture_enabled,workday_start").eq("id",user.id).maybeSingle(),
@@ -1754,7 +1758,13 @@ async function showAuthenticated(session){
     loginPanel.classList.remove("hidden");appPanel.classList.add("hidden");userArea.classList.add("hidden");
   }
 }
-function showLoggedOut(){closeAiCamera();stopRealtime();loginPanel.classList.remove("hidden");appPanel.classList.add("hidden");userArea.classList.add("hidden");currentUser=null;currentProfile=null;currentShoe=null;currentGames=[];setSync("準備中","pending")}
+function showLoggedOut(){
+  closeAiCamera();stopRealtime();
+  loginPanel.classList.add("hidden");appPanel.classList.add("hidden");userArea.classList.add("hidden");
+  currentUser=null;currentProfile=null;currentShoe=null;currentGames=[];
+  setSync("準備中","pending");
+  window.location.replace("https://hawkvisionai.com/");
+}
 
 
 
