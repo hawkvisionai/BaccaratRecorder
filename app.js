@@ -92,7 +92,7 @@ window.addEventListener("load",()=>{
 
 setTimeout(forceFinishBrandIntro,BRAND_INTRO_FAILSAFE_MS);
 
-const APP_BUILD="17.3.9";
+const APP_BUILD="17.4.0";
 
 function syncVisibleAppVersion(){
   const el=document.getElementById("appVersionBadge");
@@ -104,7 +104,23 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 const SUPABASE_URL = "https://rwxujvpakpemiwkitltk.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_aN_1_fzAV3hR6FmW7FTZGg_6SF0MUHF";
-const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+const HAWKVISION_AUTH_COOKIE="hv-sso-auth-v1";
+const hawkvisionCookieStorage={
+  getItem(key){
+    const prefix=encodeURIComponent(key)+"=";
+    const row=document.cookie.split("; ").find(v=>v.startsWith(prefix));
+    return row?decodeURIComponent(row.slice(prefix.length)):null;
+  },
+  setItem(key,value){
+    document.cookie=`${encodeURIComponent(key)}=${encodeURIComponent(value)}; Domain=.hawkvisionai.com; Path=/; Max-Age=2592000; SameSite=Lax; Secure`;
+  },
+  removeItem(key){
+    document.cookie=`${encodeURIComponent(key)}=; Domain=.hawkvisionai.com; Path=/; Max-Age=0; SameSite=Lax; Secure`;
+  }
+};
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY,{auth:{storage:hawkvisionCookieStorage,storageKey:HAWKVISION_AUTH_COOKIE,persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const USER_ADMIN_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/manage-users`;
 const AI_CAPTURE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/analyze-capture`;
 const $ = id => document.getElementById(id);
@@ -1760,7 +1776,7 @@ async function login(){
   catch{showMessage(loginMessage,"登入失敗，請確認帳號或密碼","error")}
   finally{setBusy(false)}
 }
-async function logout(){await supabase.auth.signOut()}
+async function logout(){await supabase.auth.signOut({scope:"global"}).catch(()=>{});window.location.href="https://hawkvisionai.com/"}
 async function loadCurrentProfile(user){
   const [{data,error},{data:hasRecordAccess,error:accessError}]=await Promise.all([
     supabase.from("profiles").select("id,email,username,display_name,role,is_active,ai_capture_enabled,workday_start").eq("id",user.id).maybeSingle(),
@@ -2270,3 +2286,6 @@ if(document.readyState==="loading"){
 }else{
   syncVisibleAppVersion();
 }
+
+
+document.getElementById("hawkvisionHomeButton")?.addEventListener("click",()=>{window.location.href="https://hawkvisionai.com/"});
