@@ -10,20 +10,8 @@
   <link rel="apple-touch-icon" href="hawkvision-app-icon.png?v=1" />
   <link rel="stylesheet" href="style.css?v=17.3.9" />
 </head>
-<body class="brand-intro-active">
-  <div id="appVersionBadge" class="app-version-badge" aria-label="目前版本">v17.4.1</div>
-
-  <div id="brandIntro" class="brand-intro" aria-label="HawkVision 品牌開場">
-    <div class="intro-brand">
-      <div class="intro-logo-wrap">
-        <img src="hawkvision-logo.png" alt="HawkVision Logo" class="intro-logo" />
-        <span class="intro-eye-flash" aria-hidden="true"></span>
-      </div>
-      <div class="intro-name">Hawk<span>Vision</span></div>
-      <div class="intro-slogan">SEE EVERY MOVE. STAY AHEAD.</div>
-    </div>
-  </div>
-
+<body>
+  <div id="appVersionBadge" class="app-version-badge" aria-label="目前版本">v17.4.2</div>
   <main class="container">
     <header class="topbar">
       <div class="brand-lockup">
@@ -37,7 +25,7 @@
         <div class="user-meta"><strong id="userDisplayName">—</strong><span id="userRoleBadge" class="role-badge">—</span></div>
         <button id="dashboardButton" class="primary hidden" type="button">管理總覽</button>
         <button id="userManagerButton" class="warning hidden" type="button">人員管理</button>
-        <a id="hawkvisionHomeButton" class="secondary" href="https://hawkvisionai.com/" style="text-decoration:none;display:inline-flex;align-items:center">返回 HawkVision</a><button id="logoutButton" class="secondary" type="button">登出</button>
+        <a id="hawkvisionHomeButton" class="secondary" href="https://hawkvisionai.com/" style="text-decoration:none;display:inline-flex;align-items:center;pointer-events:auto;position:relative;z-index:3">返回 HawkVision</a><button id="logoutButton" class="secondary" type="button">登出</button>
       </div>
     </header>
 
@@ -52,7 +40,7 @@
       </div>
       <label>帳號<input id="emailInput" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="管理員可用 Email；記錄員輸入帳號" /></label>
       <label>密碼<input id="passwordInput" type="password" autocomplete="current-password" placeholder="你的密碼" /></label>
-      <button id="loginButton" class="primary" type="button">登入</button><a class="secondary" href="https://hawkvisionai.com/" style="text-decoration:none;display:inline-flex;justify-content:center;margin-top:8px">返回 HawkVision</a>
+      <button id="loginButton" class="primary" type="button">登入</button><a class="secondary" href="https://hawkvisionai.com/" style="text-decoration:none;display:inline-flex;justify-content:center;margin-top:8px;pointer-events:auto;position:relative;z-index:3">返回 HawkVision</a>
       <p id="loginMessage" class="message"></p><p class="login-note">帳號由管理員建立，不開放自行註冊。</p>
     </section>
 
@@ -578,6 +566,6 @@
       </div>
     </div>
   </div>
-<script type="module" src="app.js?v=17.3.9"></script>
+<script type="module" src="app.js?v=17.4.2"></script>
 </body>
 </html>
