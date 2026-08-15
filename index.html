@@ -8,10 +8,97 @@
   <link rel="icon" type="image/png" href="favicon.png?v=1" />
   <link rel="shortcut icon" href="favicon.ico?v=1" />
   <link rel="apple-touch-icon" href="hawkvision-app-icon.png?v=1" />
-  <link rel="stylesheet" href="style.css?v=17.3.9" />
+  <link rel="stylesheet" href="style.css?v=17.4.6" />
+
+<style>
+/* v17.4.6 — 手機版專用頂部重新編排；桌面版完全不變 */
+@media (max-width: 700px) {
+  .topbar{
+    display:block !important;
+    padding:14px !important;
+  }
+  .topbar .brand-lockup{
+    width:100% !important;
+    display:flex !important;
+    justify-content:center !important;
+    align-items:center !important;
+    margin:0 0 14px !important;
+  }
+  .topbar .header-logo{
+    max-width:min(100%, 360px) !important;
+    height:auto !important;
+  }
+  .topbar .brand-copy{
+    display:none !important;
+  }
+
+  #userArea.user-area{
+    width:100% !important;
+    display:grid !important;
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+    gap:9px !important;
+    align-items:stretch !important;
+  }
+  #userArea.hidden{
+    display:none !important;
+  }
+  #userArea .user-meta{
+    grid-column:1 / -1 !important;
+    display:flex !important;
+    flex-direction:row !important;
+    justify-content:center !important;
+    align-items:center !important;
+    gap:8px !important;
+    padding:2px 0 4px !important;
+    min-width:0 !important;
+  }
+  #userArea .user-meta strong{
+    font-size:18px !important;
+    line-height:1.2 !important;
+  }
+  #userArea .role-badge{
+    white-space:nowrap !important;
+  }
+
+  #dashboardButton{
+    grid-column:1 / -1 !important;
+    width:100% !important;
+    min-height:50px !important;
+    margin:0 !important;
+    font-size:17px !important;
+  }
+
+  #userManagerButton,
+  #hawkvisionHomeButton,
+  #logoutButton{
+    width:100% !important;
+    min-width:0 !important;
+    min-height:44px !important;
+    margin:0 !important;
+    padding:9px 8px !important;
+    border-radius:12px !important;
+    font-size:15px !important;
+    line-height:1.1 !important;
+    justify-content:center !important;
+    white-space:nowrap !important;
+  }
+
+  #hawkvisionHomeButton{
+    background:linear-gradient(180deg,#334155,#1e293b) !important;
+    color:#e2e8f0 !important;
+    border:1px solid rgba(148,163,184,.38) !important;
+    box-shadow:0 3px 10px rgba(0,0,0,.16) !important;
+  }
+
+  .status-card{
+    margin-top:12px !important;
+  }
+}
+</style>
+
 </head>
 <body>
-  <div id="appVersionBadge" class="app-version-badge" aria-label="目前版本">v17.4.4</div>
+  <div id="appVersionBadge" class="app-version-badge" aria-label="目前版本">v17.4.6</div>
   <main class="container">
     <header class="topbar">
       <div class="brand-lockup">
@@ -566,6 +653,6 @@
       </div>
     </div>
   </div>
-<script type="module" src="app.js?v=17.4.4"></script>
+<script type="module" src="app.js?v=17.4.6"></script>
 </body>
 </html>

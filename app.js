@@ -1,4 +1,4 @@
-const APP_BUILD="17.4.3";
+const APP_BUILD="17.4.6";
 
 function syncVisibleAppVersion(){
   const el=document.getElementById("appVersionBadge");
@@ -1705,7 +1705,8 @@ async function login(){
   finally{setBusy(false)}
 }
 async function logout(){
-  await supabase.auth.signOut({scope:"global"}).catch(()=>{});
+  try{ await supabase.auth.signOut({scope:"global"}); }catch{}
+  try{ await supabase.auth.signOut({scope:"local"}); }catch{}
   hvClearActiveUser();
   window.location.replace("https://hawkvisionai.com/?logout=1");
 }
